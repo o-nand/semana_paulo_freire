@@ -1,7 +1,13 @@
 let scenary, player, rope, opponent;
+
+let didPlayerPulled = false,
+    didOpponentPulled = false;
+
+let defaultRopePosition,
+    lastPlayerPosition,
+    lastOpponentPosition;
+
 let lastEventFrame = 0;
-let didPlayerPulled = false;
-let defaultRopePosition, defaultPlayerPosition;
 let force = 5;
 let angle = 0;
 
@@ -89,14 +95,12 @@ function setup() {
     );
 
     defaultRopePosition = rope.y;
-    defaultPlayerPosition = player.x;
 }
 
 function draw() {
     const amplitude = 0.5;
     const horizontal_oscillation = cos(angle) * amplitude;
     const vertical_oscillation = sin(angle) * amplitude;
-    const currentFrame = frameCount;
 
     background(0, 170, 255);
 
@@ -105,14 +109,21 @@ function draw() {
     opponent.draw();
     rope.draw(); 
 
+    // oponente possui uma chance de 0.1% de puxar a corda a cada frame
+    if(Math.random() < 1/100 && !(didPlayerPulled || didOpponentPulled)) {
+        didOpponentPulled = true;
+        lastOpponentPosition = opponent.x;
+        lastEventFrame = frameCount;
+    }
+
     if(didPlayerPulled) {
-        const eventDuration = currentFrame - lastEventFrame;
+        const eventDuration = frameCount - lastEventFrame;
         rope.y = defaultRopePosition;
 
         if(eventDuration <= 15) {
             player.x += force;
         } else {
-            player.x = lerp(player.x, defaultPlayerPosition, 0.24);
+            player.x = lerp(player.x, lastPlayerPosition, 0.24);
         }
 
         if(eventDuration <= 30) {
@@ -124,18 +135,38 @@ function draw() {
             didPlayerPulled = false;
             force = 5;
         }
+    } else if(didOpponentPulled) {
+        const eventDuration = frameCount - lastEventFrame;
+        rope.y = defaultRopePosition;
+
+        if(eventDuration <= 15) {
+            opponent.x -= force;
+        } else {
+            opponent.x = lerp(opponent.x, lastOpponentPosition, 0.24);
+        }
+
+        if(eventDuration <= 30) {
+            player.x -= force;
+            force -= 0.1;
+        }
+
+        if(eventDuration > 30) {
+            didOpponentPulled = false;
+            force = 5;
+        }
     } else {
-        player.x += horizontal_oscillation * 2.5;
+        player.x += (horizontal_oscillation * 2.5);
         rope.y -= vertical_oscillation;
-        opponent.x += horizontal_oscillation * 2.5;
+        opponent.x += (horizontal_oscillation * 2.5);
+        angle += 0.05;
     }
 
-    angle += 0.05;
 }
 
 function keyPressed() {
-    if(keyCode === 32 && !didPlayerPulled) { // tecla espaço
+    if(keyCode === 32 && !(didPlayerPulled || didOpponentPulled)) { // tecla espaço
         didPlayerPulled = true;
         lastEventFrame = frameCount;
+        lastPlayerPosition = player.x;  
     }
 }
