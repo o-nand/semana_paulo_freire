@@ -21,6 +21,16 @@ class Scenary {
 
         this.surfaceHeight = displayHeight / 4;
         this.surfaceY = this.groundY - this.surfaceHeight;
+
+        this.holeX = displayWidth / 2;
+    
+        this.outerHoleWidth = displayWidth / 3;
+        this.outerHoleHeight = this.surfaceHeight / 1.2;
+        this.outerHoleY = this.surfaceY + (this.outerHoleHeight / 2) + 10;
+
+        this.innerHoleWidth = displayWidth / 3.5;
+        this.innerHoleHeight = this.surfaceHeight / 1.5;
+        this.innerHoleY = this.surfaceY + (this.innerHoleHeight / 2) + 20;
     }
 
     draw() {
@@ -31,6 +41,14 @@ class Scenary {
         noStroke();
         fill(155, 74, 31);
         rect(this.terrainX, this.surfaceY, this.terrainWidth, this.surfaceHeight);
+
+        noStroke();
+        fill(76, 36, 15);
+        ellipse(this.holeX, this.outerHoleY, this.outerHoleWidth, this.outerHoleHeight);
+
+        noStroke();
+        fill(25, 12, 5);
+        ellipse(this.holeX, this.innerHoleY, this.innerHoleWidth, this.innerHoleHeight);
     }
 }
 
@@ -120,10 +138,10 @@ function draw() {
         const eventDuration = frameCount - lastEventFrame;
         rope.y = defaultRopePosition;
 
-        if(eventDuration <= 15) {
-            player.x += force;
+        if(eventDuration <= 5) {
+            player.x += force * 1.5;
         } else {
-            player.x = lerp(player.x, lastPlayerPosition, 0.24);
+            player.x = lerp(player.x, lastPlayerPosition, 0.1);
         }
 
         if(eventDuration <= 30) {
@@ -139,10 +157,10 @@ function draw() {
         const eventDuration = frameCount - lastEventFrame;
         rope.y = defaultRopePosition;
 
-        if(eventDuration <= 15) {
-            opponent.x -= force;
+        if(eventDuration <= 5) {
+            opponent.x -= force * 1.5;
         } else {
-            opponent.x = lerp(opponent.x, lastOpponentPosition, 0.24);
+            opponent.x = lerp(opponent.x, lastOpponentPosition, 0.1);
         }
 
         if(eventDuration <= 30) {
