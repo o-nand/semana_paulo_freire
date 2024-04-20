@@ -1,7 +1,11 @@
 let scenary, player, rope, opponent;
 
-let didPlayerPulled = false,
-    didOpponentPulled = false;
+const EVENTS = {
+    PULL: Symbol("pull"),
+    NONE: Symbol("none")
+};
+let current_event = EVENTS.NONE;
+let event_target;
 
 let lastPlayerPosition,
     lastOpponentPosition;
@@ -124,63 +128,56 @@ function draw() {
     scenary.draw();
     player.draw();
     opponent.draw();
-    rope.draw(); 
+    rope.draw();
 
-    // oponente possui uma chance de 0.1% de puxar a corda a cada frame
-    if(Math.random() < 1/100 && !(didPlayerPulled || didOpponentPulled)) {
-        // didOpponentPulled = true;
-        lastOpponentPosition = opponent.x;
-        lastEventFrame = frameCount;
+    switch(current_event) {
+        case EVENTS.NONE:
+            player.x += (horizontal_oscillation * 2.5);
+            rope.y -= vertical_oscillation;
+            opponent.x += (horizontal_oscillation * 2.5);
+
+            // // oponente possui uma chance de 0.1% de puxar a corda a cada frame
+            // if(Math.random() < 1/100) {
+            //     current_event = EVENTS.PULL;
+            //     event_target = {puller: opponent, pulled: player};
+
+            //     lastOpponentPosition = opponent.x;
+            //     lastEventFrame = frameCount;
+            // }
+
+            angle += 0.05;
+        break;
+        case EVENTS.PULL:
+            const lastPosition = (event_target.puller == player) ? lastPlayerPosition : lastOpponentPosition;
+            const eventDuration = frameCount - lastEventFrame;
+
+            if(eventDuration <= 5) {
+                if(event_target.puller == player) event_target.puller.x += (force * 1.5);
+                else event_target.puller.x -= (force * 1.5);
+            } else {
+                event_target.puller.x = lerp(event_target.puller.x, lastPosition, 0.1);
+            }
+
+            if(eventDuration <= 30) {
+                if(event_target.puller == player) event_target.pulled.x += force;
+                else event_target.pulled.x -= force;
+                force -= 0.1;
+            }
+
+            if(eventDuration > 30) {
+                force = 5;
+                current_event = EVENTS.NONE;
+            }
+        break;
+        default: /* unreachable */ break;
     }
-
-    if(didPlayerPulled) {
-        const eventDuration = frameCount - lastEventFrame;
-
-        if(eventDuration <= 5) {
-            player.x += force * 1.5;
-        } else {
-            player.x = lerp(player.x, lastPlayerPosition, 0.1);
-        }
-
-        if(eventDuration <= 30) {
-            opponent.x += force;
-            force -= 0.1;
-        }
-
-        if(eventDuration > 30) {
-            didPlayerPulled = false;
-            force = 5;
-        }
-    } else if(didOpponentPulled) {
-        const eventDuration = frameCount - lastEventFrame;
-
-        if(eventDuration <= 5) {
-            opponent.x -= force * 1.5;
-        } else {
-            opponent.x = lerp(opponent.x, lastOpponentPosition, 0.1);
-        }
-
-        if(eventDuration <= 30) {
-            player.x -= force;
-            force -= 0.1;
-        }
-
-        if(eventDuration > 30) {
-            didOpponentPulled = false;
-            force = 5;
-        }
-    } else {
-        player.x += (horizontal_oscillation * 2.5);
-        rope.y -= vertical_oscillation;
-        opponent.x += (horizontal_oscillation * 2.5);
-        angle += 0.05;
-    }
-
 }
 
 function keyPressed() {
-    if(keyCode === 32 && !(didPlayerPulled || didOpponentPulled)) { // tecla espaço
-        didPlayerPulled = true;
+    if(keyCode === 32 && current_event == EVENTS.NONE) { // ao pressionar a tecla «espaço»
+        current_event = EVENTS.PULL;
+        event_target = {puller: player, pulled: opponent};
+
         lastEventFrame = frameCount;
         lastPlayerPosition = player.x;  
     }
