@@ -19,7 +19,7 @@ class Scenary {
         this.groundY = displayHeight - this.groundHeight;
 
         this.surfaceHeight = displayHeight / 4;
-        this.surfaceY = this.groundY - this.surfaceHeight;
+        this.surfaceY = this.groundY - this.surfaceHeight + 1;
 
         this.holeX = displayWidth / 2;
     
