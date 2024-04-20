@@ -86,29 +86,30 @@ class Rope {
     }
 }
 
-function setup() {
-    const height = 200;
-
+function setup() {    
     createCanvas(displayWidth, displayHeight);
     noSmooth();
 
     scenary = new Scenary();
+    rope = new Rope(scenary.surfaceY - 30, 10);
+
+    const characterWidth = 50;
+    const characterHeight = 200;
+    const characterY = (scenary.surfaceY * 1.2) - characterHeight; // no centro da superfície
 
     player = new Character(
         displayWidth - (displayWidth / 8), // canto direito
-        scenary.surfaceY - (height / 2), // no centro da superfície
-        50,
-        height,
+        characterY,
+        characterWidth,
+        characterHeight,
         color(20, 25, 104)
     );
 
-    rope = new Rope(scenary.surfaceY - 30, 10);
-
     opponent = new Character(
-        (displayWidth / 8) - 50, // canto esquerdo
-        scenary.surfaceY - (height / 2), // no centro da superfície
-        50,
-        height,
+        (displayWidth / 8) - characterWidth, // canto esquerdo
+        characterY, // no centro da superfície
+        characterWidth,
+        characterHeight,
         color(122, 18, 59)
     );
 
@@ -129,7 +130,7 @@ function draw() {
 
     // oponente possui uma chance de 0.1% de puxar a corda a cada frame
     if(Math.random() < 1/100 && !(didPlayerPulled || didOpponentPulled)) {
-        didOpponentPulled = true;
+        // didOpponentPulled = true;
         lastOpponentPosition = opponent.x;
         lastEventFrame = frameCount;
     }
