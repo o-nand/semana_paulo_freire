@@ -3,8 +3,7 @@ let scenary, player, rope, opponent;
 let didPlayerPulled = false,
     didOpponentPulled = false;
 
-let defaultRopePosition,
-    lastPlayerPosition,
+let lastPlayerPosition,
     lastOpponentPosition;
 
 let lastEventFrame = 0;
@@ -91,7 +90,6 @@ function setup() {
     noSmooth();
 
     scenary = new Scenary();
-    rope = new Rope(scenary.surfaceY - 30, 10);
 
     const characterWidth = 50;
     const characterHeight = 200;
@@ -113,7 +111,7 @@ function setup() {
         color(122, 18, 59)
     );
 
-    defaultRopePosition = rope.y;
+    rope = new Rope(characterY + (characterHeight / 2.5), 10);
 }
 
 function draw() {
@@ -137,7 +135,6 @@ function draw() {
 
     if(didPlayerPulled) {
         const eventDuration = frameCount - lastEventFrame;
-        rope.y = defaultRopePosition;
 
         if(eventDuration <= 5) {
             player.x += force * 1.5;
@@ -156,7 +153,6 @@ function draw() {
         }
     } else if(didOpponentPulled) {
         const eventDuration = frameCount - lastEventFrame;
-        rope.y = defaultRopePosition;
 
         if(eventDuration <= 5) {
             opponent.x -= force * 1.5;
