@@ -1,18 +1,24 @@
 let scenary, player, rope, opponent;
+let defaultOpponentPosition;
 
 const EVENTS = {
     PULL: Symbol("pull"),
+    FELL: Symbol("fell"),
+    REAPEARANCE: Symbol("reapearance"),
     NONE: Symbol("none")
 };
-let current_event = EVENTS.NONE;
-let event_target;
+let currentEvent = EVENTS.NONE;
+let eventTarget;
+let lastEventFrame = 0;
 
 let lastPlayerPosition,
     lastOpponentPosition;
+let lastFallenY,
+    lastFallenHeight;
 
-let lastEventFrame = 0;
-let force = 5;
-let angle = 0;
+let angle = 0,
+    force = 5,
+    fall = 0;
 
 class Scenary {
     constructor() {
@@ -23,10 +29,11 @@ class Scenary {
         this.groundY = displayHeight - this.groundHeight;
 
         this.surfaceHeight = displayHeight / 4;
+        //                                                  v offset pra remover o gap com o ground
         this.surfaceY = this.groundY - this.surfaceHeight + 1;
 
         this.holeX = displayWidth / 2;
-    
+
         this.outerHoleWidth = displayWidth / 3;
         this.outerHoleHeight = this.surfaceHeight / 1.2;
         this.outerHoleY = this.surfaceY + (this.outerHoleHeight / 2) + 10;
@@ -40,7 +47,7 @@ class Scenary {
         noStroke();
         fill(104, 50, 20);
         rect(this.terrainX, this.groundY, this.terrainWidth, this.groundHeight);
-    
+
         noStroke();
         fill(155, 74, 31);
         rect(this.terrainX, this.surfaceY, this.terrainWidth, this.surfaceHeight);
@@ -67,7 +74,7 @@ class Character {
     draw() {
         // criará uma sombra embaixo do personagem
         fill(0, 0, 0, 20);
-        ellipse(this.x + (this.width / 2), this.y + this.height, this.width * 2, 40); 
+        ellipse(this.x + (this.width / 2), this.y + this.height, this.width * 2, 40);
 
         fill(this.color);
         rect(this.x, this.y, this.width, this.height);
@@ -80,7 +87,6 @@ class Rope {
         this.y = y;
         this.width = displayWidth;
         this.height = height;
-        this.angle = 0;
     }
 
     draw() {
@@ -89,7 +95,7 @@ class Rope {
     }
 }
 
-function setup() {    
+function setup() {
     createCanvas(displayWidth, displayHeight);
     noSmooth();
 
@@ -114,6 +120,7 @@ function setup() {
         characterHeight,
         color(122, 18, 59)
     );
+    defaultOpponentPosition = opponent.x;
 
     rope = new Rope(characterY + (characterHeight / 2.5), 10);
 }
@@ -130,55 +137,104 @@ function draw() {
     opponent.draw();
     rope.draw();
 
-    switch(current_event) {
-        case EVENTS.NONE:
-            player.x += (horizontal_oscillation * 2.5);
-            rope.y -= vertical_oscillation;
-            opponent.x += (horizontal_oscillation * 2.5);
+    switch(currentEvent) {
+        case EVENTS.NONE: {
+            player.x += horizontal_oscillation;
+            rope.y -= vertical_oscillation / 2;
+            opponent.x += horizontal_oscillation;
 
             // // oponente possui uma chance de 0.1% de puxar a corda a cada frame
             // if(Math.random() < 1/100) {
-            //     current_event = EVENTS.PULL;
-            //     event_target = {puller: opponent, pulled: player};
+            //     currentEvent = EVENTS.PULL;
+            //     eventTarget = {puller: opponent, pulled: player};
 
             //     lastOpponentPosition = opponent.x;
             //     lastEventFrame = frameCount;
             // }
 
             angle += 0.05;
-        break;
-        case EVENTS.PULL:
-            const lastPosition = (event_target.puller == player) ? lastPlayerPosition : lastOpponentPosition;
+        } break;
+        case EVENTS.PULL: {
+            const lastPosition = (eventTarget.puller == player) ? lastPlayerPosition : lastOpponentPosition;
             const eventDuration = frameCount - lastEventFrame;
 
-            if(eventDuration <= 5) {
-                if(event_target.puller == player) event_target.puller.x += (force * 1.5);
-                else event_target.puller.x -= (force * 1.5);
-            } else {
-                event_target.puller.x = lerp(event_target.puller.x, lastPosition, 0.1);
+            if(eventDuration <= 5) { // no início do evento
+                if(eventTarget.puller == player)
+                    eventTarget.puller.x += force;
+                else eventTarget.puller.x -= force;
             }
 
-            if(eventDuration <= 30) {
-                if(event_target.puller == player) event_target.pulled.x += force;
-                else event_target.pulled.x -= force;
+            if(eventDuration <= 30) { // durante todo o evento
+                eventTarget.puller.x = lerp(eventTarget.puller.x, lastPosition, 0.15);
+
+                if(eventTarget.puller == player)
+                    eventTarget.pulled.x += force;
+                else eventTarget.pulled.x -= force;
                 force -= 0.1;
+
+                const outerHoleRadius = scenary.innerHoleWidth / 2;
+                //                                                            v offset pro personagem não ficar grudado na borda
+                const holeEdge = Math.floor(scenary.holeX - outerHoleRadius - (eventTarget.pulled.width / 4));
+
+                if(eventTarget.pulled.x >= holeEdge) {
+                    force = 5;
+                    eventTarget = eventTarget.pulled;
+                    lastFallenHeight = eventTarget.height;
+                    lastFallenY = eventTarget.y;
+                    currentEvent = EVENTS.FELL;
+                }
             }
 
-            if(eventDuration > 30) {
+            if(eventDuration > 30) { // no final do evento
                 force = 5;
-                current_event = EVENTS.NONE;
+                currentEvent = EVENTS.NONE;
             }
-        break;
+        } break;
+        case EVENTS.FELL: {
+            eventTarget.x += 2;
+            eventTarget.y += fall;
+            eventTarget.height -= fall;
+            fall += 1.5;
+
+            if(eventTarget.height <= 0) {
+                fall = 0;
+                eventTarget.x = -eventTarget.width; // fora da tela
+                eventTarget.y = lastFallenY;
+                eventTarget.height = lastFallenHeight;
+
+                lastEventFrame = frameCount;
+                currentEvent = EVENTS.REAPEARANCE;
+            }
+        } break;
+        case EVENTS.REAPEARANCE: {
+            const eventDuration = frameCount - lastEventFrame;
+
+            if(eventDuration <= 5) { // no início do evento
+                player.x += force;
+                force -= 0.05;
+            }
+
+            if(eventDuration <= 30) { // durante todo o evento
+                opponent.x = lerp(opponent.x, defaultOpponentPosition, 0.1);
+                if(eventDuration >= 10) {
+                    player.x = lerp(player.x, lastPlayerPosition, 0.1);
+                }
+            }
+
+            if(eventDuration >= 30) { // no final do evento
+                currentEvent = EVENTS.NONE;
+            }
+        } break;
         default: /* unreachable */ break;
     }
 }
 
 function keyPressed() {
-    if(keyCode === 32 && current_event == EVENTS.NONE) { // ao pressionar a tecla «espaço»
-        current_event = EVENTS.PULL;
-        event_target = {puller: player, pulled: opponent};
+    if(keyCode === 32 && currentEvent == EVENTS.NONE) { // ao pressionar a tecla «espaço»
+        currentEvent = EVENTS.PULL;
+        eventTarget = {puller: player, pulled: opponent};
 
         lastEventFrame = frameCount;
-        lastPlayerPosition = player.x;  
+        lastPlayerPosition = player.x;
     }
 }
