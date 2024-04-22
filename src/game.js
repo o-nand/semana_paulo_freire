@@ -164,7 +164,7 @@ function draw() {
                 else eventTarget.puller.x -= force;
             }
 
-            if(eventDuration <= 30) { // durante todo o evento
+            if(eventDuration > 5) { // durante todo o evento
                 eventTarget.puller.x = lerp(eventTarget.puller.x, lastPosition, 0.15);
 
                 if(eventTarget.puller == player)
@@ -185,7 +185,7 @@ function draw() {
                 }
             }
 
-            if(eventDuration > 30) { // no final do evento
+            if(eventDuration >= 30) { // no final do evento
                 force = 5;
                 currentEvent = EVENTS.NONE;
             }
@@ -209,19 +209,24 @@ function draw() {
         case EVENTS.REAPEARANCE: {
             const eventDuration = frameCount - lastEventFrame;
 
-            if(eventDuration <= 5) { // no início do evento
+            // no início do evento
+            if(eventDuration <= 10) {
                 player.x += force;
-                force -= 0.05;
+                force -= 0.1;
             }
 
-            if(eventDuration <= 30) { // durante todo o evento
+            // durante todo o evento
+            if (eventDuration > 5) {
                 opponent.x = lerp(opponent.x, defaultOpponentPosition, 0.1);
-                if(eventDuration >= 10) {
-                    player.x = lerp(player.x, lastPlayerPosition, 0.1);
-                }
             }
 
-            if(eventDuration >= 30) { // no final do evento
+            if(eventDuration > 10) {
+                player.x = lerp(player.x, lastPlayerPosition, 0.1);
+            }
+
+            // no final do evento
+            if(eventDuration >= 30) {
+                force = 5;
                 currentEvent = EVENTS.NONE;
             }
         } break;
