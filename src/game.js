@@ -139,6 +139,10 @@ function draw() {
 
     switch(currentEvent) {
         case EVENTS.NONE: {
+            /* FIXME:
+            ao aplicar a oscilação tanto player quanto no oponente, suas posições levemente variam, o que pessoalmente
+            me incomoda, mas é quase imperceptível
+            */
             player.x += horizontal_oscillation;
             rope.y -= vertical_oscillation / 2;
             opponent.x += horizontal_oscillation;
@@ -165,7 +169,7 @@ function draw() {
             }
 
             if(eventDuration > 5) { // durante todo o evento
-                eventTarget.puller.x = lerp(eventTarget.puller.x, lastPosition, 0.15);
+                eventTarget.puller.x = Math.floor(lerp(eventTarget.puller.x, lastPosition, 0.1));
 
                 if(eventTarget.puller == player)
                     eventTarget.pulled.x += force;
@@ -216,16 +220,16 @@ function draw() {
             }
 
             // durante todo o evento
-            if (eventDuration > 5) {
-                opponent.x = lerp(opponent.x, defaultOpponentPosition, 0.1);
+            if(eventDuration > 5) {
+                opponent.x = Math.floor(lerp(opponent.x, defaultOpponentPosition, 0.1));
             }
 
             if(eventDuration > 10) {
-                player.x = lerp(player.x, lastPlayerPosition, 0.1);
+                player.x = Math.floor(lerp(player.x, lastPlayerPosition, 0.1));
             }
 
             // no final do evento
-            if(eventDuration >= 30) {
+            if(eventDuration >= 40) {
                 force = 5;
                 currentEvent = EVENTS.NONE;
             }
