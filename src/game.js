@@ -147,7 +147,7 @@ function draw() {
             rope.y -= vertical_oscillation / 2;
             opponent.x += horizontal_oscillation;
 
-            // // oponente possui uma chance de 0.1% de puxar a corda a cada frame
+            // oponente possui uma chance de 0.1% de puxar a corda a cada frame
             // if(Math.random() < 1/100) {
             //     currentEvent = EVENTS.PULL;
             //     eventTarget = {puller: opponent, pulled: player};
@@ -162,25 +162,25 @@ function draw() {
             const lastPosition = (eventTarget.puller == player) ? lastPlayerPosition : lastOpponentPosition;
             const eventDuration = frameCount - lastEventFrame;
 
-            if(eventDuration <= 5) { // no início do evento
-                if(eventTarget.puller == player)
-                    eventTarget.puller.x += force;
-                else eventTarget.puller.x -= force;
+            // no início do evento
+            if(eventDuration <= 5) {
+                eventTarget.puller.x += (eventTarget.puller == player) ? force : -force;
             }
 
-            if(eventDuration > 5) { // durante todo o evento
-                eventTarget.puller.x = Math.floor(lerp(eventTarget.puller.x, lastPosition, 0.1));
+            // durante todo o evento
+            eventTarget.pulled.x += (eventTarget.puller == player) ? force : -force;
+            force -= 0.1;
 
-                if(eventTarget.puller == player)
-                    eventTarget.pulled.x += force;
-                else eventTarget.pulled.x -= force;
-                force -= 0.1;
-
+            if(eventDuration > 5) {
+                eventTarget.puller.x = lerp(eventTarget.puller.x, lastPosition, 0.15);
                 const outerHoleRadius = scenary.innerHoleWidth / 2;
-                //                                                            v offset pro personagem não ficar grudado na borda
-                const holeEdge = Math.floor(scenary.holeX - outerHoleRadius - (eventTarget.pulled.width / 4));
+                const offset = outerHoleRadius - eventTarget.pulled.width / 4;
+                const holeEdge = (eventTarget.puller == player) ?
+                                    (scenary.holeX - offset) :
+                                    (scenary.holeX + offset);
 
-                if(eventTarget.pulled.x >= holeEdge) {
+                if((eventTarget.puller == player && eventTarget.pulled.x >= holeEdge)
+                || (eventTarget.puller == opponent && eventTarget.pulled.x <= holeEdge)) {
                     force = 5;
                     eventTarget = eventTarget.pulled;
                     lastFallenHeight = eventTarget.height;
@@ -189,18 +189,21 @@ function draw() {
                 }
             }
 
-            if(eventDuration >= 30) { // no final do evento
+            // no final do evento
+            if(eventDuration >= 45) {
                 force = 5;
                 currentEvent = EVENTS.NONE;
             }
         } break;
         case EVENTS.FELL: {
-            eventTarget.x += 2;
+            eventTarget.x += (eventTarget == player) ? -2 : 2;
             eventTarget.y += fall;
             eventTarget.height -= fall;
             fall += 1.5;
 
             if(eventTarget.height <= 0) {
+                if(eventTarget == player) location.reload(); // TODO: tela de morte
+
                 fall = 0;
                 eventTarget.x = -eventTarget.width; // fora da tela
                 eventTarget.y = lastFallenY;
