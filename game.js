@@ -1,4 +1,4 @@
-let scenary, player, rope, opponent;
+let scoringSystem, scenary, player, rope, opponent;
 let defaultOpponentPosition;
 
 const EVENTS = {
@@ -19,6 +19,54 @@ let lastFallenY,
 let angle = 0,
     force = 5,
     fall = 0;
+
+let scored = false;
+let lastScoreFrame = 0;
+
+class ScoringSystem {
+    constructor() {
+        this.score = 0;
+        this.newPointSize = 0;
+        this.newPointY = displayHeight / 2;
+        this.textX = (displayWidth / 2) - 6;
+    }
+
+    drawScore() {
+        fill("white");
+        textSize(64);
+        textAlign(CENTER);
+        text(this.score, this.textX, 90);
+    }
+
+    drawNewPoint() {
+        const scoreDuration = frameCount - lastScoreFrame;
+
+        fill("white");
+        textAlign(CENTER);
+        textSize(this.newPointSize);
+        text("+1", this.textX, this.newPointY);
+
+        // no início do evento
+        if(scoreDuration <= 30) {
+            this.newPointSize = lerp(this.newPointSize, 42, 0.1);
+            this.newPointY = lerp(this.newPointY, displayHeight / 4, 0.1);
+        }
+
+        // durante todo o evento
+        if(scoreDuration > 40 && scoreDuration <= 60) {
+            this.newPointSize = lerp(this.newPointSize, 0, 0.1);
+            this.newPointY = lerp(this.newPointY, 90, 0.1);
+        }
+
+        // no final do evento
+        if(scoreDuration > 60) {
+            this.score++;
+            this.newPointSize = 0
+            this.newPointY = displayHeight / 2;
+            scored = false;
+        }
+    }
+}
 
 class Scenary {
     constructor() {
@@ -99,6 +147,7 @@ function setup() {
     createCanvas(displayWidth, displayHeight);
     noSmooth();
 
+    scoringSystem = new ScoringSystem();
     scenary = new Scenary();
 
     const characterWidth = 50;
@@ -132,10 +181,15 @@ function draw() {
 
     background(0, 170, 255);
 
+    scoringSystem.drawScore();
     scenary.draw();
     player.draw();
     opponent.draw();
     rope.draw();
+
+    if(scored) {
+        scoringSystem.drawNewPoint();
+    }
 
     switch(currentEvent) {
         case EVENTS.NONE: {
@@ -211,6 +265,9 @@ function draw() {
 
                 lastEventFrame = frameCount;
                 currentEvent = EVENTS.REAPEARANCE;
+
+                scored = true;
+                lastScoreFrame = frameCount;
             }
         } break;
         case EVENTS.REAPEARANCE: {
