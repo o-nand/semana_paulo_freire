@@ -147,7 +147,7 @@ function draw() {
             rope.y -= vertical_oscillation / 2;
             opponent.x += horizontal_oscillation;
 
-            // oponente possui uma chance de 0.1% de puxar a corda a cada frame
+            // oponente possui uma chance de 1% de puxar a corda a cada frame
             // if(Math.random() < 1/100) {
             //     currentEvent = EVENTS.PULL;
             //     eventTarget = {puller: opponent, pulled: player};
