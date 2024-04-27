@@ -1,3 +1,5 @@
+// - Variáveis Globais -
+
 let scoringSystem, scenary, player, rope, opponent;
 let defaultOpponentPosition;
 
@@ -23,11 +25,14 @@ let angle = 0,
 let scored = false;
 let lastScoreFrame = 0;
 
+// - Estruturas -
+
 class ScoringSystem {
     constructor() {
         this.score = 0;
         this.newPointSize = 0;
         this.newPointY = displayHeight / 2;
+        //                                v tamanho de cada letra, é descontado para ficar perfeitamente centralizado
         this.textX = (displayWidth / 2) - 6;
     }
 
@@ -84,11 +89,11 @@ class Scenary {
 
         this.outerHoleWidth = displayWidth / 3;
         this.outerHoleHeight = this.surfaceHeight / 1.2;
-        this.outerHoleY = this.surfaceY + (this.outerHoleHeight / 2) + 10;
+        this.outerHoleY = this.surfaceY + (this.outerHoleHeight / 1.8);
 
         this.innerHoleWidth = displayWidth / 3.5;
         this.innerHoleHeight = this.surfaceHeight / 1.5;
-        this.innerHoleY = this.surfaceY + (this.innerHoleHeight / 2) + 20;
+        this.innerHoleY = this.surfaceY + (this.innerHoleHeight / 1.5);
     }
 
     draw() {
@@ -130,11 +135,11 @@ class Character {
 }
 
 class Rope {
-    constructor(y, height) {
+    constructor(y) {
         this.x = 0;
         this.y = y;
         this.width = displayWidth;
-        this.height = height;
+        this.height = 10;
     }
 
     draw() {
@@ -143,6 +148,9 @@ class Rope {
     }
 }
 
+// - Principais Funções -
+
+// executará apenas uma vez, no início do jogo
 function setup() {
     createCanvas(displayWidth, displayHeight);
     noSmooth();
@@ -164,16 +172,19 @@ function setup() {
 
     opponent = new Character(
         (displayWidth / 8) - characterWidth, // canto esquerdo
-        characterY, // no centro da superfície
+        characterY,
         characterWidth,
         characterHeight,
         color(122, 18, 59)
     );
     defaultOpponentPosition = opponent.x;
 
-    rope = new Rope(characterY + (characterHeight / 2.5), 10);
+    rope = new Rope(
+        characterY + (characterHeight / 2.5) // ficará um pouco acima do centro dos personagens
+    );
 }
 
+// executará todo frame
 function draw() {
     const amplitude = 0.5;
     const horizontal_oscillation = cos(angle) * amplitude;
@@ -298,6 +309,7 @@ function draw() {
     }
 }
 
+// executará toda vez que o usuário apertar alguma tecla
 function keyPressed() {
     if(keyCode === 32 && currentEvent == EVENTS.NONE) { // ao pressionar a tecla «espaço»
         currentEvent = EVENTS.PULL;
