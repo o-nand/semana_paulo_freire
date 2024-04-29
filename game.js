@@ -25,6 +25,8 @@ let angle = 0,
 let scored = false;
 let lastScoreFrame = 0;
 
+let round = 0;
+
 // - Estruturas -
 
 class ScoringSystem {
@@ -32,7 +34,7 @@ class ScoringSystem {
         this.score = 0;
         this.newPointSize = 0;
         this.newPointY = displayHeight / 2;
-        //                                v tamanho de cada letra, é descontado para ficar perfeitamente centralizado
+        //                                v tamanho de cada letra, é descontado pro texto ficar perfeitamente centralizado
         this.textX = (displayWidth / 2) - 6;
     }
 
@@ -233,16 +235,24 @@ function draw() {
             }
 
             // durante todo o evento
-            eventTarget.pulled.x += (eventTarget.puller == player) ? force : -force;
+            if(round == 0 && eventTarget.puller == player) {
+                eventTarget.pulled.x += force * 3.5; // no primeiro round, o oponente será forçado a cair
+            } else {
+                const appliedForce = (round >= 10) ?
+                                        force :
+                                        force * (2 - round / 10); // força diminuirá meio a cada round
+                eventTarget.pulled.x += (eventTarget.puller == player) ?
+                                            appliedForce :
+                                            -(force / 2); // se o puxado for o jogador, ele sofrerá apenas metade da força
+            }
             force -= 0.1;
 
             if(eventDuration > 5) {
                 eventTarget.puller.x = lerp(eventTarget.puller.x, lastPosition, 0.15);
                 const outerHoleRadius = scenary.innerHoleWidth / 2;
-                const offset = outerHoleRadius - eventTarget.pulled.width / 4;
                 const holeEdge = (eventTarget.puller == player) ?
-                                    (scenary.holeX - offset) :
-                                    (scenary.holeX + offset);
+                                    (scenary.holeX - (outerHoleRadius + eventTarget.pulled.width / 3)) :
+                                    (scenary.holeX + (outerHoleRadius - eventTarget.pulled.width / 3));
 
                 if((eventTarget.puller == player && eventTarget.pulled.x >= holeEdge)
                 || (eventTarget.puller == opponent && eventTarget.pulled.x <= holeEdge)) {
@@ -261,7 +271,7 @@ function draw() {
             }
         } break;
         case EVENTS.FELL: {
-            eventTarget.x += (eventTarget == player) ? -2 : 2;
+            eventTarget.x += (eventTarget == player) ? -4 : 4;
             eventTarget.y += fall;
             eventTarget.height -= fall;
             fall += 1.5;
@@ -302,6 +312,7 @@ function draw() {
             // no final do evento
             if(eventDuration >= 40) {
                 force = 5;
+                round++;
                 currentEvent = EVENTS.NONE;
             }
         } break;
