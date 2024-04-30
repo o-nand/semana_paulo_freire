@@ -1,20 +1,25 @@
 // - Variáveis Globais -
 
-let scoringSystem, scenary, player, rope, opponent;
+let pullingSystem,
+    scoringSystem,
+    scenary,
+    player,
+    rope,
+    opponent;
 let defaultOpponentPosition;
 
 const EVENTS = {
     PULL: Symbol("pull"),
     FELL: Symbol("fell"),
     REAPEARANCE: Symbol("reapearance"),
+    COUNTDOWN: Symbol("countdown"),
     NONE: Symbol("none")
 };
-let currentEvent = EVENTS.NONE;
+let currentEvent = EVENTS.COUNTDOWN;
 let eventTarget;
 let lastEventFrame = 0;
 
-let lastPlayerPosition,
-    lastOpponentPosition;
+let lastCharacterPosition;
 let lastFallenY,
     lastFallenHeight;
 
@@ -27,7 +32,67 @@ let lastScoreFrame = 0;
 
 let round = 0;
 
+let count = 3;
+let countY;
+let countTransparency = 0;
+
 // - Estruturas -
+
+class PullingSystem {
+    constructor() {
+        this.containerBorderSize = 5;
+        this.containerWidth = 50;
+        this.containerHeight = displayHeight / 2.5;
+        this.containerX = displayWidth - this.containerWidth - this.containerBorderSize;
+        this.containerY = (displayHeight / 1.8) - this.containerHeight;
+
+        this.targetY;
+        this.targetHeight = 20;
+
+        this.pointerY;
+        this.pointerHeight = 5;
+        this.pointerVelocity = 1;
+        this.pointerDirection; // 1 = baixo, -1 = cima
+
+        this.containedWidth = 50 - (this.containerBorderSize * 2);
+        this.containedX = this.containerX + this.containerBorderSize;
+        this.containerBottom = this.containerY + this.containerHeight - this.containerBorderSize;
+        this.containerTop = this.containerY + this.containerBorderSize;
+    }
+
+    randomizeContained() {
+        this.targetY =
+            Math.random() * ((this.containerBottom - this.targetHeight) - this.containerTop) + this.containerTop;
+
+        if(this.pointerDirection == 1) {
+            this.pointerDirection = -1;
+            this.pointerY = this.containerBottom;
+        } else {
+            this.pointerDirection = 1;
+            this.pointerY = this.containerTop;
+        }
+    }
+
+    drawContainer() {
+        strokeWeight(this.containerBorderSize);
+        stroke(40);
+        fill(70, 70, 70);
+        rect(this.containerX, this.containerY, this.containerWidth, this.containerHeight);
+        noStroke();
+    }
+
+    drawContained() {
+        fill(80, 215, 70);
+        rect(this.containedX, this.targetY, this.containedWidth, this.targetHeight);
+
+        fill(255, 255, 255);
+        rect(this.containedX, this.pointerY, this.containedWidth, this.pointerHeight);
+    }
+
+    movePointer() {
+        this.pointerY += this.pointerVelocity * this.pointerDirection;
+    }
+}
 
 class ScoringSystem {
     constructor() {
@@ -152,12 +217,21 @@ class Rope {
 
 // - Principais Funções -
 
+function returnToDefaultEvent() {
+    currentEvent = EVENTS.NONE;
+    pullingSystem.randomizeContained();
+    fall = 0;
+    force = 5;
+}
+
 // executará apenas uma vez, no início do jogo
 function setup() {
     createCanvas(displayWidth, displayHeight);
     noSmooth();
 
     scoringSystem = new ScoringSystem();
+    pullingSystem = new PullingSystem();
+
     scenary = new Scenary();
 
     const characterWidth = 50;
@@ -184,6 +258,8 @@ function setup() {
     rope = new Rope(
         characterY + (characterHeight / 2.5) // ficará um pouco acima do centro dos personagens
     );
+
+    countY = displayHeight / 3 - 40;
 }
 
 // executará todo frame
@@ -194,18 +270,63 @@ function draw() {
 
     background(0, 170, 255);
 
-    scoringSystem.drawScore();
     scenary.draw();
     player.draw();
     opponent.draw();
     rope.draw();
+
+    if(currentEvent != EVENTS.COUNTDOWN) {
+        pullingSystem.drawContainer();
+        scoringSystem.drawScore();
+    }
 
     if(scored) {
         scoringSystem.drawNewPoint();
     }
 
     switch(currentEvent) {
+        case EVENTS.COUNTDOWN: {
+            const eventDuration = frameCount - lastEventFrame;
+            let message = count;
+
+            if(eventDuration % 60 == 0) { // a cada segundo (60 frames correspondem à 1 segundo)
+                count--;
+                countTransparency = 0;
+                countY = displayHeight / 3 - 40;
+            }
+
+            if(count < 0) returnToDefaultEvent();
+
+            if(count == 0) message = "PUXE!";
+
+            // escurece a tela
+            fill(0, 0, 0, 100);
+            rect(0, 0, displayWidth, displayHeight);
+
+            // desenha a contagem regressiva
+            countY = lerp(countY, displayHeight / 3, 0.05);
+            countTransparency = lerp(countTransparency, 500, 0.05);
+
+            textSize(128);
+            textAlign(CENTER);
+            fill(255, 255, 255, countTransparency);
+            text(message, displayWidth / 2, countY);
+        } break;
         case EVENTS.NONE: {
+            const targetBottom = pullingSystem.targetY + pullingSystem.targetHeight
+            const targetTop = pullingSystem.targetY - pullingSystem.pointerHeight;
+
+            pullingSystem.drawContained();
+            pullingSystem.movePointer();
+
+            if(pullingSystem.pointerDirection == 1 && pullingSystem.pointerY > targetBottom
+            || pullingSystem.pointerDirection == -1 && pullingSystem.pointerY < targetTop) {
+                currentEvent = EVENTS.PULL;
+                eventTarget = {puller: opponent, pulled: player};
+                lastCharacterPosition = opponent.x;
+                lastEventFrame = frameCount;
+            }
+
             /* FIXME:
             ao aplicar a oscilação tanto player quanto no oponente, suas posições levemente variam, o que pessoalmente
             me incomoda, mas é quase imperceptível
@@ -214,19 +335,9 @@ function draw() {
             rope.y -= vertical_oscillation / 2;
             opponent.x += horizontal_oscillation;
 
-            // oponente possui uma chance de 1% de puxar a corda a cada frame
-            // if(Math.random() < 1/100) {
-            //     currentEvent = EVENTS.PULL;
-            //     eventTarget = {puller: opponent, pulled: player};
-
-            //     lastOpponentPosition = opponent.x;
-            //     lastEventFrame = frameCount;
-            // }
-
             angle += 0.05;
         } break;
         case EVENTS.PULL: {
-            const lastPosition = (eventTarget.puller == player) ? lastPlayerPosition : lastOpponentPosition;
             const eventDuration = frameCount - lastEventFrame;
 
             // no início do evento
@@ -235,20 +346,16 @@ function draw() {
             }
 
             // durante todo o evento
-            if(round == 0 && eventTarget.puller == player) {
-                eventTarget.pulled.x += force * 3.5; // no primeiro round, o oponente será forçado a cair
-            } else {
-                const appliedForce = (round >= 10) ?
-                                        force :
-                                        force * (2 - round / 10); // força diminuirá meio a cada round
-                eventTarget.pulled.x += (eventTarget.puller == player) ?
-                                            appliedForce :
-                                            -(force / 2); // se o puxado for o jogador, ele sofrerá apenas metade da força
-            }
+
+            // a força diminuirá meio a cada round, até chegar no round 20
+            const forceOnOpponent = (round >= 25) ? force : force * (3.5 - round / 10);
+            eventTarget.pulled.x += (eventTarget.puller == player) ?
+                                        forceOnOpponent :
+                                        -(force / 2); // se o puxado for o jogador, ele sofrerá apenas metade da força
             force -= 0.1;
 
             if(eventDuration > 5) {
-                eventTarget.puller.x = lerp(eventTarget.puller.x, lastPosition, 0.15);
+                eventTarget.puller.x = lerp(eventTarget.puller.x, lastCharacterPosition, 0.15);
                 const outerHoleRadius = scenary.innerHoleWidth / 2;
                 const holeEdge = (eventTarget.puller == player) ?
                                     (scenary.holeX - (outerHoleRadius + eventTarget.pulled.width / 3)) :
@@ -265,10 +372,7 @@ function draw() {
             }
 
             // no final do evento
-            if(eventDuration >= 45) {
-                force = 5;
-                currentEvent = EVENTS.NONE;
-            }
+            if(eventDuration >= 45) returnToDefaultEvent();
         } break;
         case EVENTS.FELL: {
             eventTarget.x += (eventTarget == player) ? -4 : 4;
@@ -306,14 +410,14 @@ function draw() {
             }
 
             if(eventDuration > 10) {
-                player.x = Math.floor(lerp(player.x, lastPlayerPosition, 0.1));
+                player.x = Math.floor(lerp(player.x, lastCharacterPosition, 0.1));
             }
 
             // no final do evento
             if(eventDuration >= 40) {
-                force = 5;
                 round++;
-                currentEvent = EVENTS.NONE;
+                pullingSystem.pointerVelocity += 0.1;
+                returnToDefaultEvent();
             }
         } break;
         default: /* unreachable */ break;
@@ -323,10 +427,18 @@ function draw() {
 // executará toda vez que o usuário apertar alguma tecla
 function keyPressed() {
     if(keyCode === 32 && currentEvent == EVENTS.NONE) { // ao pressionar a tecla «espaço»
-        currentEvent = EVENTS.PULL;
-        eventTarget = {puller: player, pulled: opponent};
+        const targetBottom = pullingSystem.targetY + pullingSystem.targetHeight
+        const targetTop = pullingSystem.targetY - pullingSystem.pointerHeight;
 
+        currentEvent = EVENTS.PULL;
         lastEventFrame = frameCount;
-        lastPlayerPosition = player.x;
+
+        if(pullingSystem.pointerY > targetTop && pullingSystem.pointerY < targetBottom) {
+            eventTarget = {puller: player, pulled: opponent};
+            lastCharacterPosition = player.x;
+        } else {
+            eventTarget = {puller: opponent, pulled: player};
+            lastCharacterPosition = opponent.x;
+        }
     }
 }
