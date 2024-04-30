@@ -21,7 +21,8 @@ let lastEventFrame = 0;
 
 let lastCharacterPosition;
 let lastFallenY,
-    lastFallenHeight;
+    lastFallenHeight,
+    lastFallenForce;
 
 let angle = 0,
     force = 5,
@@ -61,8 +62,9 @@ class PullingSystem {
     }
 
     randomizeContained() {
-        this.targetY =
-            Math.random() * ((this.containerBottom - this.targetHeight) - this.containerTop) + this.containerTop;
+        const minTargetTop = this.containerTop + this.containerHeight / 5;
+        const maxTargetBottom = (this.containerBottom - this.targetHeight) - this.containerHeight / 5;
+        this.targetY = Math.random() * (maxTargetBottom - minTargetTop) + minTargetTop;
 
         if(this.pointerDirection == 1) {
             this.pointerDirection = -1;
@@ -99,8 +101,7 @@ class ScoringSystem {
         this.score = 0;
         this.newPointSize = 0;
         this.newPointY = displayHeight / 2;
-        //                                v tamanho de cada letra, é descontado pro texto ficar perfeitamente centralizado
-        this.textX = (displayWidth / 2) - 6;
+        this.textX = displayWidth / 2;
     }
 
     drawScore() {
@@ -290,9 +291,10 @@ function draw() {
             let message = count;
 
             if(eventDuration % 60 == 0) { // a cada segundo (60 frames correspondem à 1 segundo)
+                const offset = 40;
                 count--;
                 countTransparency = 0;
-                countY = displayHeight / 3 - 40;
+                countY = (displayHeight / 3) - offset;
             }
 
             if(count < 0) returnToDefaultEvent();
@@ -309,7 +311,7 @@ function draw() {
 
             textSize(128);
             textAlign(CENTER);
-            fill(255, 255, 255, countTransparency);
+            fill(255, 255, 255, countTransparency); // branco
             text(message, displayWidth / 2, countY);
         } break;
         case EVENTS.NONE: {
@@ -319,6 +321,7 @@ function draw() {
             pullingSystem.drawContained();
             pullingSystem.movePointer();
 
+            // verifica se o ponteiro saiu do alcance do alvo
             if(pullingSystem.pointerDirection == 1 && pullingSystem.pointerY > targetBottom
             || pullingSystem.pointerDirection == -1 && pullingSystem.pointerY < targetTop) {
                 currentEvent = EVENTS.PULL;
@@ -339,6 +342,7 @@ function draw() {
         } break;
         case EVENTS.PULL: {
             const eventDuration = frameCount - lastEventFrame;
+            const eventEnd = 45;
 
             // no início do evento
             if(eventDuration <= 5) {
@@ -347,8 +351,16 @@ function draw() {
 
             // durante todo o evento
 
-            // a força diminuirá meio a cada round, até chegar no round 20
-            const forceOnOpponent = (round >= 25) ? force : force * (3.5 - round / 10);
+            let forceOnOpponent = force;
+
+            // no primeiro round, o oponente será forçado a cair
+            if(round == 0) {
+                const velocityNeeded = displayWidth / eventEnd; // velocidade necessária pra atingir o buraco na duração do evento
+                forceOnOpponent *= velocityNeeded / (force * 2);
+            } else if(round <= 20) { // a força contra o oponente diminuirá meio a cada round, até chegar no round 22
+                forceOnOpponent = (force * 2) - (round / 10);
+            }
+
             eventTarget.pulled.x += (eventTarget.puller == player) ?
                                         forceOnOpponent :
                                         -(force / 2); // se o puxado for o jogador, ele sofrerá apenas metade da força
@@ -358,24 +370,25 @@ function draw() {
                 eventTarget.puller.x = lerp(eventTarget.puller.x, lastCharacterPosition, 0.15);
                 const outerHoleRadius = scenary.innerHoleWidth / 2;
                 const holeEdge = (eventTarget.puller == player) ?
-                                    (scenary.holeX - (outerHoleRadius + eventTarget.pulled.width / 3)) :
-                                    (scenary.holeX + (outerHoleRadius - eventTarget.pulled.width / 3));
+                                    (scenary.holeX - (outerHoleRadius + eventTarget.pulled.width / 2)) :
+                                    (scenary.holeX + (outerHoleRadius - eventTarget.pulled.width / 2));
 
                 if((eventTarget.puller == player && eventTarget.pulled.x >= holeEdge)
                 || (eventTarget.puller == opponent && eventTarget.pulled.x <= holeEdge)) {
                     force = 5;
                     eventTarget = eventTarget.pulled;
-                    lastFallenHeight = eventTarget.height;
                     lastFallenY = eventTarget.y;
+                    lastFallenHeight = eventTarget.height;
+                    lastFallenForce = (eventTarget == player) ? -force : forceOnOpponent;
                     currentEvent = EVENTS.FELL;
                 }
             }
 
             // no final do evento
-            if(eventDuration >= 45) returnToDefaultEvent();
+            if(eventDuration >= eventEnd) returnToDefaultEvent();
         } break;
         case EVENTS.FELL: {
-            eventTarget.x += (eventTarget == player) ? -4 : 4;
+            eventTarget.x += lastFallenForce;
             eventTarget.y += fall;
             eventTarget.height -= fall;
             fall += 1.5;
