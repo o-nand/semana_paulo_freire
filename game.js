@@ -44,21 +44,33 @@ class PullingSystem {
         this.containerBorderSize = 5;
         this.containerWidth = 50;
         this.containerHeight = displayHeight / 2.5;
-        this.containerX = displayWidth - this.containerWidth - this.containerBorderSize;
+        this.containerX = (displayWidth - this.containerWidth) - this.containerBorderSize;
         this.containerY = (displayHeight / 1.8) - this.containerHeight;
 
         this.targetY;
         this.targetHeight = 20;
+        this.targetTop;
+        this.targetBottom;
 
         this.pointerY;
         this.pointerHeight = 5;
         this.pointerVelocity = 1;
-        this.pointerDirection; // 1 = baixo, -1 = cima
+        this.pointerDirection = 1; // 1 = baixo, -1 = cima
 
-        this.containedWidth = 50 - (this.containerBorderSize * 2);
         this.containedX = this.containerX + this.containerBorderSize;
-        this.containerBottom = this.containerY + this.containerHeight - this.containerBorderSize;
+        this.containedWidth = 50 - (this.containerBorderSize * 2); // multiplicado por 2 pra descontar as bordas de ambos os lados
+        this.containerBottom = (this.containerY + this.containerHeight) - this.containerBorderSize;
         this.containerTop = this.containerY + this.containerBorderSize;
+
+        this.containedAnimatedX = this.containedX;
+        this.containedAnimateWidth = this.containedWidth;
+        this.containedTransparency = 500;
+
+        this.targetAnimatedHeight = this.targetHeight;
+        this.pointerAnimatedHeight = this.pointerHeight;
+
+        this.lastWasHit = false;
+        this.lastWasFail = false;
     }
 
     randomizeContained() {
@@ -66,13 +78,11 @@ class PullingSystem {
         const maxTargetBottom = (this.containerBottom - this.targetHeight) - this.containerHeight / 5;
         this.targetY = Math.random() * (maxTargetBottom - minTargetTop) + minTargetTop;
 
-        if(this.pointerDirection == 1) {
-            this.pointerDirection = -1;
-            this.pointerY = this.containerBottom;
-        } else {
-            this.pointerDirection = 1;
-            this.pointerY = this.containerTop;
-        }
+        this.targetTop = this.targetY - this.pointerHeight;
+        this.targetBottom = this.targetY + this.targetHeight;
+
+        this.pointerDirection = -this.pointerDirection;
+        this.pointerY = (this.pointerDirection === 1) ? this.containerTop : this.containerBottom;
     }
 
     drawContainer() {
@@ -81,18 +91,70 @@ class PullingSystem {
         fill(70, 70, 70);
         rect(this.containerX, this.containerY, this.containerWidth, this.containerHeight);
         noStroke();
+
+        if(this.lastWasHit || this.lastWasFail) {
+            this.drawContainedRemains();
+        }
     }
 
     drawContained() {
+        // desenha o alvo
         fill(80, 215, 70);
         rect(this.containedX, this.targetY, this.containedWidth, this.targetHeight);
 
+        // desenha o pointeiro
         fill(255, 255, 255);
         rect(this.containedX, this.pointerY, this.containedWidth, this.pointerHeight);
     }
 
+    drawContainedRemains() {
+        const targetColor = (this.lastWasHit) ?
+                                color(80, 215, 70, this.containedTransparency) : // verde padrão se tiver acertado
+                                color(247, 30, 30, this.containedTransparency);  // vermelho se tiver rerrado
+        this.containedTransparency = Math.floor(lerp(this.containedTransparency, 0, 0.1));
+
+        this.containedAnimatedX -= 0.5;
+        this.containedAnimateWidth++;
+
+        this.targetY -= 0.5;
+        this.targetAnimatedHeight++;
+
+        fill(targetColor);
+        rect(this.containedAnimatedX, this.targetY, this.containedAnimateWidth, this.targetAnimatedHeight);
+
+        if(this.lastWasFail) { // desenha o ponteiro se a última interação tiver sido uma falha
+            this.pointerAnimatedHeight++;
+            fill(255, 255, 255, this.containedTransparency);
+            rect(this.containedAnimatedX, this.pointerY, this.containedAnimateWidth, this.pointerHeight);
+        }
+
+        if(this.containedTransparency === 0) {
+            this.resetAnimation();
+        }
+    }
+
+    resetAnimation() {
+        this.containedAnimatedX = this.containedX;
+        this.containedAnimateWidth = this.containedWidth;
+        this.containedTransparency = 500;
+        this.targetAnimatedHeight = this.targetHeight;
+        this.pointerAnimatedHeight = this.pointerHeight;
+        this.lastWasHit = false;
+        this.lastWasFail = false;
+    }
+
     movePointer() {
         this.pointerY += this.pointerVelocity * this.pointerDirection;
+    }
+
+    isPointerOutOfBounds() {
+        return this.pointerDirection === -1 && this.pointerY < this.targetTop
+            || this.pointerDirection === 1 && this.pointerY > this.targetBottom;
+    }
+
+    isPointerInBounds() {
+        return this.pointerY > this.targetTop
+            && this.pointerY < this.targetBottom;
     }
 }
 
@@ -105,7 +167,7 @@ class ScoringSystem {
     }
 
     drawScore() {
-        fill("white");
+        fill(255, 255, 255);
         textSize(64);
         textAlign(CENTER);
         text(this.score, this.textX, 90);
@@ -114,7 +176,7 @@ class ScoringSystem {
     drawNewPoint() {
         const scoreDuration = frameCount - lastScoreFrame;
 
-        fill("white");
+        fill(255, 255, 255);
         textAlign(CENTER);
         textSize(this.newPointSize);
         text("+1", this.textX, this.newPointY);
@@ -260,7 +322,8 @@ function setup() {
         characterY + (characterHeight / 2.5) // ficará um pouco acima do centro dos personagens
     );
 
-    countY = displayHeight / 3 - 40;
+    //                             v offset pra deixar o texto inicialmente um pouco abaixo
+    countY = (displayHeight / 3) - 40;
 }
 
 // executará todo frame
@@ -276,7 +339,7 @@ function draw() {
     opponent.draw();
     rope.draw();
 
-    if(currentEvent != EVENTS.COUNTDOWN) {
+    if(currentEvent !== EVENTS.COUNTDOWN) {
         pullingSystem.drawContainer();
         scoringSystem.drawScore();
     }
@@ -290,16 +353,15 @@ function draw() {
             const eventDuration = frameCount - lastEventFrame;
             let message = count;
 
-            if(eventDuration % 60 == 0) { // a cada segundo (60 frames correspondem à 1 segundo)
-                const offset = 40;
+            if(eventDuration % 60 === 0) { // a cada segundo (60 frames correspondem à 1 segundo)
                 count--;
                 countTransparency = 0;
-                countY = (displayHeight / 3) - offset;
+                //                             v offset pra deixar o texto inicialmente um pouco abaixo
+                countY = (displayHeight / 3) - 40;
             }
 
             if(count < 0) returnToDefaultEvent();
-
-            if(count == 0) message = "PUXE!";
+            if(count === 0) message = "PUXE!";
 
             // escurece a tela
             fill(0, 0, 0, 100);
@@ -315,25 +377,17 @@ function draw() {
             text(message, displayWidth / 2, countY);
         } break;
         case EVENTS.NONE: {
-            const targetBottom = pullingSystem.targetY + pullingSystem.targetHeight
-            const targetTop = pullingSystem.targetY - pullingSystem.pointerHeight;
-
             pullingSystem.drawContained();
             pullingSystem.movePointer();
 
-            // verifica se o ponteiro saiu do alcance do alvo
-            if(pullingSystem.pointerDirection == 1 && pullingSystem.pointerY > targetBottom
-            || pullingSystem.pointerDirection == -1 && pullingSystem.pointerY < targetTop) {
-                currentEvent = EVENTS.PULL;
+            if(pullingSystem.isPointerOutOfBounds()) {
+                lastEventFrame = frameCount;
                 eventTarget = {puller: opponent, pulled: player};
                 lastCharacterPosition = opponent.x;
-                lastEventFrame = frameCount;
+                currentEvent = EVENTS.PULL;
+                pullingSystem.lastWasFail = true;
             }
 
-            /* FIXME:
-            ao aplicar a oscilação tanto player quanto no oponente, suas posições levemente variam, o que pessoalmente
-            me incomoda, mas é quase imperceptível
-            */
             player.x += horizontal_oscillation;
             rope.y -= vertical_oscillation / 2;
             opponent.x += horizontal_oscillation;
@@ -353,8 +407,7 @@ function draw() {
 
             let forceOnOpponent = force;
 
-            // no primeiro round, o oponente será forçado a cair
-            if(round == 0) {
+            if(round == 0) { // no primeiro round, o oponente será forçado a cair
                 const velocityNeeded = displayWidth / eventEnd; // velocidade necessária pra atingir o buraco na duração do evento
                 forceOnOpponent *= velocityNeeded / (force * 2);
             } else if(round <= 20) { // a força contra o oponente diminuirá meio a cada round, até chegar no round 22
@@ -373,8 +426,8 @@ function draw() {
                                     (scenary.holeX - (outerHoleRadius + eventTarget.pulled.width / 2)) :
                                     (scenary.holeX + (outerHoleRadius - eventTarget.pulled.width / 2));
 
-                if((eventTarget.puller == player && eventTarget.pulled.x >= holeEdge)
-                || (eventTarget.puller == opponent && eventTarget.pulled.x <= holeEdge)) {
+                if((eventTarget.puller === player && eventTarget.pulled.x >= holeEdge)
+                || (eventTarget.puller === opponent && eventTarget.pulled.x <= holeEdge)) {
                     force = 5;
                     eventTarget = eventTarget.pulled;
                     lastFallenY = eventTarget.y;
@@ -394,7 +447,7 @@ function draw() {
             fall += 1.5;
 
             if(eventTarget.height <= 0) {
-                if(eventTarget == player) location.reload(); // TODO: tela de morte
+                if(eventTarget === player) location.reload(); // TODO: tela de morte
 
                 fall = 0;
                 eventTarget.x = -eventTarget.width; // fora da tela
@@ -404,8 +457,8 @@ function draw() {
                 lastEventFrame = frameCount;
                 currentEvent = EVENTS.REAPEARANCE;
 
-                scored = true;
                 lastScoreFrame = frameCount;
+                scored = true;
             }
         } break;
         case EVENTS.REAPEARANCE: {
@@ -439,19 +492,19 @@ function draw() {
 
 // executará toda vez que o usuário apertar alguma tecla
 function keyPressed() {
-    if(keyCode === 32 && currentEvent == EVENTS.NONE) { // ao pressionar a tecla «espaço»
-        const targetBottom = pullingSystem.targetY + pullingSystem.targetHeight
-        const targetTop = pullingSystem.targetY - pullingSystem.pointerHeight;
-
-        currentEvent = EVENTS.PULL;
+    if(keyCode === 32 && currentEvent === EVENTS.NONE) { // ao pressionar a tecla «espaço»
         lastEventFrame = frameCount;
 
-        if(pullingSystem.pointerY > targetTop && pullingSystem.pointerY < targetBottom) {
+        if(pullingSystem.isPointerInBounds()) {
             eventTarget = {puller: player, pulled: opponent};
             lastCharacterPosition = player.x;
+            pullingSystem.lastWasHit = true;
         } else {
             eventTarget = {puller: opponent, pulled: player};
             lastCharacterPosition = opponent.x;
+            pullingSystem.lastWasFail = true;
         }
+
+        currentEvent = EVENTS.PULL;
     }
 }
