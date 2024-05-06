@@ -235,24 +235,26 @@ class ScoringSystem {
 }
 
 class Scenary {
-    constructor(holeY) {
+    constructor() {
         this.skySprite = loadImage("assets/ceu.png");
         this.skyX = 0;
         this.skyY = 0;
         this.skyWidth = displayWidth;
-        this.skyHeight = displayHeight / 8;
 
         this.backgroundSprite = loadImage("assets/background.png");
         this.backgroundX = 0;
-        this.backgroundY = -45;
         this.backgroundWidth = displayWidth;
         this.backgroundHeight = displayHeight / 1.4;
+
+        this.skyHeight = this.backgroundHeight / 5.8;
 
         this.terrainSprite = loadImage("assets/chao.png");
         this.terrainHeight = displayHeight / 2.5;
         this.terrainX = 0;
         this.terrainY = displayHeight - this.terrainHeight;
         this.terrainWidth = displayWidth;
+        
+        this.backgroundY = -(this.terrainHeight / 6);
 
         this.holeSprite = loadImage("assets/buraco.png");
         this.holeX = displayWidth / 4;
