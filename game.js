@@ -184,7 +184,7 @@ class PullingSystem {
 class ScoringSystem {
     constructor() {
         this.score = 0;
-        this.record = localStorage.getItem("record");
+        this.record = localStorage.getItem("record") || 0;
 
         this.newPointSize = 0;
         this.newPointY = displayHeight / 2;
@@ -235,15 +235,18 @@ class ScoringSystem {
 }
 
 class Scenary {
-    constructor() {
+    constructor(holeY) {
         this.skySprite = loadImage("assets/ceu.png");
-        this.skyX;
+        this.skyX = 0;
+        this.skyY = 0;
+        this.skyWidth = displayWidth;
+        this.skyHeight = displayHeight / 8;
 
         this.backgroundSprite = loadImage("assets/background.png");
         this.backgroundX = 0;
-        this.backgroundY = -8;
+        this.backgroundY = -45;
         this.backgroundWidth = displayWidth;
-        this.backgroundHeight = displayHeight / 1.5;
+        this.backgroundHeight = displayHeight / 1.4;
 
         this.terrainSprite = loadImage("assets/chao.png");
         this.terrainHeight = displayHeight / 2.5;
@@ -253,14 +256,14 @@ class Scenary {
 
         this.holeSprite = loadImage("assets/buraco.png");
         this.holeX = displayWidth / 4;
-        this.holeY = this.terrainY + 30;
+        this.holeY = this.terrainY + 100;
         this.holeWidth = displayWidth / 2.1;
         this.holeHeight = displayHeight / 5.8;
     }
 
     draw() {
-        image(this.skySprite, 0, 0, displayWidth, displayHeight / 5);
         image(this.backgroundSprite, 0, this.backgroundY, this.backgroundWidth, this.backgroundHeight);
+        image(this.skySprite, this.skyX, this.skyY, this.skyWidth, this.skyHeight);
         image(this.terrainSprite, this.terrainX, this.terrainY, this.terrainWidth, this.terrainHeight);
         image(this.holeSprite, this.holeX, this.holeY, this.holeWidth, this.holeHeight);
     }
@@ -317,7 +320,7 @@ function setup() {
 
     const characterWidth = 160;
     const characterHeight = 240;
-    const characterY = (gScenary.terrainY * 1.2) - characterHeight;
+    const characterY = (gScenary.terrainY * 1.4) - characterHeight;
 
     gPlayer = new Character(
         displayWidth - (displayWidth / 8), // canto direito
@@ -336,9 +339,9 @@ function setup() {
         characterWidth,
         characterHeight,
         color(122, 18, 59),
-        loadImage("assets/pieroIdle.png"),
-        loadImage("assets/pieroPulling.png"),
-        loadImage("assets/pieroPulled.png")
+        loadImage("assets/ovniIdle.png"),
+        loadImage("assets/ovniPulling.png"),
+        loadImage("assets/ovniPulled.png")
     );
     gDefaultOpponentPosition = gOpponent.x;
 
@@ -356,8 +359,6 @@ function draw() {
     const amplitude = 0.5;
     const horizontalOscillation = cos(gAngle) * amplitude;
     const verticalOscillation = sin(gAngle) * (amplitude / 4.4);
-
-    background(0, 170, 255);
 
     gScenary.draw();
     gPlayer.draw();
