@@ -1,12 +1,16 @@
-// - Variáveis Globais -
+/*
+ * - Variáveis Globais -
+ * o prefixo «g» é usado para denotar que a variável possui contexto global
+ */
 
-let pullingSystem,
-    scoringSystem,
-    scenary,
-    player,
-    rope,
-    opponent;
-let defaultOpponentPosition;
+let gPullingSystem,
+    gScoringSystem,
+    gScenary,
+    gPlayer,
+    gRope,
+    gOpponent;
+let gDefaultOpponentPosition;
+let gDefaultRopePosition;
 
 const EVENTS = {
     PULL: Symbol("pull"),
@@ -15,27 +19,39 @@ const EVENTS = {
     COUNTDOWN: Symbol("countdown"),
     NONE: Symbol("none")
 };
-let currentEvent = EVENTS.COUNTDOWN;
-let eventTarget;
-let lastEventFrame = 0;
 
-let lastCharacterPosition;
-let lastFallenY,
-    lastFallenHeight,
-    lastFallenForce;
+let gCurrentEvent = EVENTS.COUNTDOWN;
+let gEventTarget;
+let gLastEventFrame = 0;
 
-let angle = 0,
-    force = 5,
-    fall = 0;
+let gLastCharacterPosition;
+let gLastFallenY,
+    gLastFallenWidth,
+    gLastFallenHeight,
+    gLastFallenForce;
 
-let scored = false;
-let lastScoreFrame = 0;
+let gAngle = 0,
+    gForce = 5,
+    gFall = 0;
 
-let round = 0;
+let gRound = 0;
 
 let count = 3;
 let countY;
 let countTransparency = 0;
+
+// - Funções Auxiliares -
+
+function returnToDefaultEvent() {
+    gCurrentEvent = EVENTS.NONE;
+    gPullingSystem.randomizeContained();
+    gFall = 0;
+    gForce = 5;
+}
+
+function randomRange(mininum, maximum) {
+    return Math.random() * (maximum - mininum) + mininum;
+}
 
 // - Estruturas -
 
@@ -47,6 +63,7 @@ class PullingSystem {
         this.containerX = (displayWidth - this.containerWidth) - this.containerBorderSize;
         this.containerY = (displayHeight / 1.8) - this.containerHeight;
 
+        this.targetSprite = loadImage("assets/alvo.png");
         this.targetY;
         this.targetHeight = 20;
         this.targetTop;
@@ -57,8 +74,9 @@ class PullingSystem {
         this.pointerVelocity = 1;
         this.pointerDirection = 1; // 1 = baixo, -1 = cima
 
-        this.containedX = this.containerX + this.containerBorderSize;
-        this.containedWidth = 50 - (this.containerBorderSize * 2); // multiplicado por 2 pra descontar as bordas de ambos os lados
+        this.containerSprite = loadImage("assets/container.png");
+        this.containedWidth = 45 - (this.containerBorderSize * 2); // multiplicado por 2 pra descontar as bordas de ambos os lados
+        this.containedX = this.containerX + this.containerBorderSize + this.containedWidth / 11;
         this.containerBottom = (this.containerY + this.containerHeight) - this.containerBorderSize;
         this.containerTop = this.containerY + this.containerBorderSize;
 
@@ -71,12 +89,14 @@ class PullingSystem {
 
         this.lastWasHit = false;
         this.lastWasFail = false;
+        this.failSprite = loadImage("assets/falha.png");
+
     }
 
     randomizeContained() {
         const minTargetTop = this.containerTop + this.containerHeight / 5;
         const maxTargetBottom = (this.containerBottom - this.targetHeight) - this.containerHeight / 5;
-        this.targetY = Math.random() * (maxTargetBottom - minTargetTop) + minTargetTop;
+        this.targetY = randomRange(minTargetTop, maxTargetBottom);
 
         this.targetTop = this.targetY - this.pointerHeight;
         this.targetBottom = this.targetY + this.targetHeight;
@@ -85,32 +105,19 @@ class PullingSystem {
         this.pointerY = (this.pointerDirection === 1) ? this.containerTop : this.containerBottom;
     }
 
-    drawContainer() {
-        strokeWeight(this.containerBorderSize);
-        stroke(40);
-        fill(70, 70, 70);
-        rect(this.containerX, this.containerY, this.containerWidth, this.containerHeight);
-        noStroke();
+    resetAnimation() {
+        this.containedAnimatedX = this.containedX;
+        this.containedAnimateWidth = this.containedWidth;
+        this.containedTransparency = 500;
 
-        if(this.lastWasHit || this.lastWasFail) {
-            this.drawContainedRemains();
-        }
-    }
+        this.targetAnimatedHeight = this.targetHeight;
+        this.pointerAnimatedHeight = this.pointerHeight;
 
-    drawContained() {
-        // desenha o alvo
-        fill(80, 215, 70);
-        rect(this.containedX, this.targetY, this.containedWidth, this.targetHeight);
-
-        // desenha o pointeiro
-        fill(255, 255, 255);
-        rect(this.containedX, this.pointerY, this.containedWidth, this.pointerHeight);
+        this.lastWasHit = false;
+        this.lastWasFail = false;
     }
 
     drawContainedRemains() {
-        const targetColor = (this.lastWasHit) ?
-                                color(80, 215, 70, this.containedTransparency) : // verde padrão se tiver acertado
-                                color(247, 30, 30, this.containedTransparency);  // vermelho se tiver rerrado
         this.containedTransparency = Math.floor(lerp(this.containedTransparency, 0, 0.1));
 
         this.containedAnimatedX -= 0.5;
@@ -119,13 +126,20 @@ class PullingSystem {
         this.targetY -= 0.5;
         this.targetAnimatedHeight++;
 
-        fill(targetColor);
-        rect(this.containedAnimatedX, this.targetY, this.containedAnimateWidth, this.targetAnimatedHeight);
+        if(this.lastWasFail) {
+            // desenha uma imagem exprimindo falha
+            const failHeight = this.containedAnimateWidth; // a imagem é um quadrado, logo a altura é a mesma que a largura
+            tint(255, this.containedTransparency);
+            image(this.failSprite, this.containedAnimatedX, this.targetY, this.containedAnimateWidth, failHeight);
+            noTint();
 
-        if(this.lastWasFail) { // desenha o ponteiro se a última interação tiver sido uma falha
+            // desenha o ponteiro
             this.pointerAnimatedHeight++;
             fill(255, 255, 255, this.containedTransparency);
             rect(this.containedAnimatedX, this.pointerY, this.containedAnimateWidth, this.pointerHeight);
+        } else {
+            fill(34, 131, 0, this.containedTransparency); // verde escuro
+            rect(this.containedAnimatedX, this.targetY, this.containedAnimateWidth, this.targetAnimatedHeight);
         }
 
         if(this.containedTransparency === 0) {
@@ -133,14 +147,23 @@ class PullingSystem {
         }
     }
 
-    resetAnimation() {
-        this.containedAnimatedX = this.containedX;
-        this.containedAnimateWidth = this.containedWidth;
-        this.containedTransparency = 500;
-        this.targetAnimatedHeight = this.targetHeight;
-        this.pointerAnimatedHeight = this.pointerHeight;
-        this.lastWasHit = false;
-        this.lastWasFail = false;
+    drawContainer() {
+        image(this.containerSprite, this.containerX, this.containerY, this.containerWidth, this.containerHeight);
+        if(this.lastWasHit || this.lastWasFail) {
+            this.drawContainedRemains();
+        }
+    }
+
+    drawContained() {
+        // desenha o alvo
+        image(this.targetSprite, this.containedX, this.targetY, this.containedWidth, this.targetHeight);
+
+        // desenha o pointeiro
+        strokeWeight(2);
+        stroke(127); // praticamente um cinza claro
+        fill(255, 255, 255);
+        rect(this.containedX, this.pointerY, this.containedWidth, this.pointerHeight);
+        noStroke();
     }
 
     movePointer() {
@@ -161,20 +184,28 @@ class PullingSystem {
 class ScoringSystem {
     constructor() {
         this.score = 0;
+        this.record = localStorage.getItem("record");
+
         this.newPointSize = 0;
         this.newPointY = displayHeight / 2;
         this.textX = displayWidth / 2;
+
+        this.scored = false;
+        this.lastScoreFrame = 0;
     }
 
     drawScore() {
         fill(255, 255, 255);
+        textSize(16);
+        textAlign(CENTER);
+        text("recorde: " + this.record, this.textX, 85);
         textSize(64);
         textAlign(CENTER);
-        text(this.score, this.textX, 90);
+        text(this.score, this.textX, 60);
     }
 
     drawNewPoint() {
-        const scoreDuration = frameCount - lastScoreFrame;
+        const scoreDuration = frameCount - this.lastScoreFrame;
 
         fill(255, 255, 255);
         textAlign(CENTER);
@@ -198,129 +229,123 @@ class ScoringSystem {
             this.score++;
             this.newPointSize = 0
             this.newPointY = displayHeight / 2;
-            scored = false;
+            this.scored = false;
         }
     }
 }
 
 class Scenary {
     constructor() {
-        this.terrainWidth = displayWidth;
+        this.skySprite = loadImage("assets/ceu.png");
+        this.skyX;
+
+        this.backgroundSprite = loadImage("assets/background.png");
+        this.backgroundX = 0;
+        this.backgroundY = -8;
+        this.backgroundWidth = displayWidth;
+        this.backgroundHeight = displayHeight / 1.5;
+
+        this.terrainSprite = loadImage("assets/chao.png");
+        this.terrainHeight = displayHeight / 2.5;
         this.terrainX = 0;
+        this.terrainY = displayHeight - this.terrainHeight;
+        this.terrainWidth = displayWidth;
 
-        this.groundHeight = displayHeight / 10;
-        this.groundY = displayHeight - this.groundHeight;
-
-        this.surfaceHeight = displayHeight / 4;
-        //                                                  v offset pra remover o gap com o ground
-        this.surfaceY = this.groundY - this.surfaceHeight + 1;
-
-        this.holeX = displayWidth / 2;
-
-        this.outerHoleWidth = displayWidth / 3;
-        this.outerHoleHeight = this.surfaceHeight / 1.2;
-        this.outerHoleY = this.surfaceY + (this.outerHoleHeight / 1.8);
-
-        this.innerHoleWidth = displayWidth / 3.5;
-        this.innerHoleHeight = this.surfaceHeight / 1.5;
-        this.innerHoleY = this.surfaceY + (this.innerHoleHeight / 1.5);
+        this.holeSprite = loadImage("assets/buraco.png");
+        this.holeX = displayWidth / 4;
+        this.holeY = this.terrainY + 30;
+        this.holeWidth = displayWidth / 2.1;
+        this.holeHeight = displayHeight / 5.8;
     }
 
     draw() {
-        noStroke();
-        fill(104, 50, 20);
-        rect(this.terrainX, this.groundY, this.terrainWidth, this.groundHeight);
-
-        noStroke();
-        fill(155, 74, 31);
-        rect(this.terrainX, this.surfaceY, this.terrainWidth, this.surfaceHeight);
-
-        noStroke();
-        fill(76, 36, 15);
-        ellipse(this.holeX, this.outerHoleY, this.outerHoleWidth, this.outerHoleHeight);
-
-        noStroke();
-        fill(25, 12, 5);
-        ellipse(this.holeX, this.innerHoleY, this.innerHoleWidth, this.innerHoleHeight);
+        image(this.skySprite, 0, 0, displayWidth, displayHeight / 5);
+        image(this.backgroundSprite, 0, this.backgroundY, this.backgroundWidth, this.backgroundHeight);
+        image(this.terrainSprite, this.terrainX, this.terrainY, this.terrainWidth, this.terrainHeight);
+        image(this.holeSprite, this.holeX, this.holeY, this.holeWidth, this.holeHeight);
     }
 }
 
 class Character {
-    constructor(x, y, width, height, color) {
-        this.x = x;
-        this.y = y;
+    constructor(x, y, width, height, color, idleSprite, pullingSprite, pulledSprite) {
+        this.x = x - (width / 3);
+        this.y = y - (height / 6);
         this.width = width;
         this.height = height;
         this.color = color;
+
+        this.idleSprite = idleSprite;
+        this.pullingSprite = pullingSprite;
+        this.pulledSprite = pulledSprite;
+        this.sprite = idleSprite;
     }
 
     draw() {
         // criará uma sombra embaixo do personagem
         fill(0, 0, 0, 20);
-        ellipse(this.x + (this.width / 2), this.y + this.height, this.width * 2, 40);
-
-        fill(this.color);
-        rect(this.x, this.y, this.width, this.height);
+        ellipse(this.x + (this.width / 2.2), this.y + this.height - 5, this.width, 40);
+        image(this.sprite, this.x, this.y, this.width, this.height);
     }
 }
 
 class Rope {
     constructor(y) {
-        this.x = 0;
-        this.y = y;
-        this.width = displayWidth;
-        this.height = 10;
+        const offset = displayWidth / 2 // pra suas extremidades não vazarem
+        this.ropeSprite = loadImage("assets/corda.png");
+        this.x = -offset / 2;
+        this.y = y - 85;
+        this.width = displayWidth + offset
+        this.height = 150;
     }
 
     draw() {
-        fill(43, 29, 0);
-        rect(this.x, this.y, this.width, this.height);
+        image(this.ropeSprite, this.x, this.y, this.width, this.height);
     }
 }
 
 // - Principais Funções -
-
-function returnToDefaultEvent() {
-    currentEvent = EVENTS.NONE;
-    pullingSystem.randomizeContained();
-    fall = 0;
-    force = 5;
-}
 
 // executará apenas uma vez, no início do jogo
 function setup() {
     createCanvas(displayWidth, displayHeight);
     noSmooth();
 
-    scoringSystem = new ScoringSystem();
-    pullingSystem = new PullingSystem();
+    gScoringSystem = new ScoringSystem();
+    gPullingSystem = new PullingSystem();
 
-    scenary = new Scenary();
+    gScenary = new Scenary();
 
-    const characterWidth = 50;
-    const characterHeight = 200;
-    const characterY = (scenary.surfaceY * 1.2) - characterHeight; // no centro da superfície
+    const characterWidth = 160;
+    const characterHeight = 240;
+    const characterY = (gScenary.terrainY * 1.2) - characterHeight;
 
-    player = new Character(
+    gPlayer = new Character(
         displayWidth - (displayWidth / 8), // canto direito
         characterY,
         characterWidth,
         characterHeight,
-        color(20, 25, 104)
+        color(20, 25, 104),
+        loadImage("assets/unicornioIdle.png"),
+        loadImage("assets/unicornioPulling.png"),
+        loadImage("assets/unicornioPulled.png")
     );
 
-    opponent = new Character(
-        (displayWidth / 8) - characterWidth, // canto esquerdo
+    gOpponent = new Character(
+        displayWidth / 8, // canto esquerdo
         characterY,
         characterWidth,
         characterHeight,
-        color(122, 18, 59)
+        color(122, 18, 59),
+        loadImage("assets/pieroIdle.png"),
+        loadImage("assets/pieroPulling.png"),
+        loadImage("assets/pieroPulled.png")
     );
-    defaultOpponentPosition = opponent.x;
+    gDefaultOpponentPosition = gOpponent.x;
 
-    rope = new Rope(
+    gRope = new Rope(
         characterY + (characterHeight / 2.5) // ficará um pouco acima do centro dos personagens
     );
+    gDefaultRopePosition = gRope.x;
 
     //                             v offset pra deixar o texto inicialmente um pouco abaixo
     countY = (displayHeight / 3) - 40;
@@ -329,28 +354,28 @@ function setup() {
 // executará todo frame
 function draw() {
     const amplitude = 0.5;
-    const horizontal_oscillation = cos(angle) * amplitude;
-    const vertical_oscillation = sin(angle) * amplitude;
+    const horizontalOscillation = cos(gAngle) * amplitude;
+    const verticalOscillation = sin(gAngle) * (amplitude / 4.4);
 
     background(0, 170, 255);
 
-    scenary.draw();
-    player.draw();
-    opponent.draw();
-    rope.draw();
+    gScenary.draw();
+    gPlayer.draw();
+    gOpponent.draw();
+    gRope.draw();
 
-    if(currentEvent !== EVENTS.COUNTDOWN) {
-        pullingSystem.drawContainer();
-        scoringSystem.drawScore();
+    if(gCurrentEvent !== EVENTS.COUNTDOWN) {
+        gPullingSystem.drawContainer();
+        gScoringSystem.drawScore();
     }
 
-    if(scored) {
-        scoringSystem.drawNewPoint();
+    if(gScoringSystem.scored) {
+        gScoringSystem.drawNewPoint();
     }
 
-    switch(currentEvent) {
+    switch(gCurrentEvent) {
         case EVENTS.COUNTDOWN: {
-            const eventDuration = frameCount - lastEventFrame;
+            const eventDuration = frameCount - gLastEventFrame;
             let message = count;
 
             if(eventDuration % 60 === 0) { // a cada segundo (60 frames correspondem à 1 segundo)
@@ -377,63 +402,88 @@ function draw() {
             text(message, displayWidth / 2, countY);
         } break;
         case EVENTS.NONE: {
-            pullingSystem.drawContained();
-            pullingSystem.movePointer();
+            gPullingSystem.drawContained();
+            gPullingSystem.movePointer();
 
-            if(pullingSystem.isPointerOutOfBounds()) {
-                lastEventFrame = frameCount;
-                eventTarget = {puller: opponent, pulled: player};
-                lastCharacterPosition = opponent.x;
-                currentEvent = EVENTS.PULL;
-                pullingSystem.lastWasFail = true;
+            if(gPullingSystem.isPointerOutOfBounds()) {
+                gLastEventFrame = frameCount;
+                gEventTarget = {puller: gOpponent, pulled: gPlayer};
+                gLastCharacterPosition = gOpponent.x;
+                gCurrentEvent = EVENTS.PULL;
+                gPullingSystem.lastWasFail = true;
             }
 
-            player.x += horizontal_oscillation;
-            rope.y -= vertical_oscillation / 2;
-            opponent.x += horizontal_oscillation;
+            gPlayer.x += horizontalOscillation;
+            gRope.x += horizontalOscillation;
+            gRope.y -= verticalOscillation;
+            gOpponent.x += horizontalOscillation;
 
-            angle += 0.05;
+            const oscillationInterval = amplitude - 0.2;
+            if(horizontalOscillation < -oscillationInterval) {
+                gPlayer.sprite = gPlayer.pulledSprite;
+                gOpponent.sprite = gOpponent.pullingSprite
+            } else if(horizontalOscillation > oscillationInterval) {
+                gPlayer.sprite = gPlayer.pullingSprite;
+                gOpponent.sprite = gOpponent.pulledSprite;
+            } else {
+                gPlayer.sprite = gPlayer.idleSprite;
+                gOpponent.sprite = gOpponent.idleSprite;
+            }
+
+            gAngle += 0.05;
         } break;
         case EVENTS.PULL: {
-            const eventDuration = frameCount - lastEventFrame;
+            const eventDuration = frameCount - gLastEventFrame;
             const eventEnd = 45;
+
+            const appliedForce = (gEventTarget.puller == gPlayer) ? gForce : -gForce;
+            let forceOnOpponent = gForce;
 
             // no início do evento
             if(eventDuration <= 5) {
-                eventTarget.puller.x += (eventTarget.puller == player) ? force : -force;
+                gEventTarget.puller.sprite = gEventTarget.puller.pullingSprite;
+                gEventTarget.puller.x += appliedForce;
+                gRope.x += appliedForce;
             }
 
             // durante todo o evento
 
-            let forceOnOpponent = force;
-
-            if(round == 0) { // no primeiro round, o oponente será forçado a cair
+            if(gRound == 0) { // no primeiro round, o oponente será forçado a cair
                 const velocityNeeded = displayWidth / eventEnd; // velocidade necessária pra atingir o buraco na duração do evento
-                forceOnOpponent *= velocityNeeded / (force * 2);
-            } else if(round <= 20) { // a força contra o oponente diminuirá meio a cada round, até chegar no round 22
-                forceOnOpponent = (force * 2) - (round / 10);
+                forceOnOpponent *= velocityNeeded / (gForce * 2);
+            } else if(gRound <= 20) { // a força contra o oponente diminuirá meio a cada round, até chegar no round 22
+                forceOnOpponent = (gForce * 2) - (gRound / 10);
             }
 
-            eventTarget.pulled.x += (eventTarget.puller == player) ?
+            gEventTarget.pulled.sprite = gEventTarget.pulled.pulledSprite;
+            gEventTarget.pulled.x += (gEventTarget.puller == gPlayer) ?
                                         forceOnOpponent :
-                                        -(force / 2); // se o puxado for o jogador, ele sofrerá apenas metade da força
-            force -= 0.1;
+                                        appliedForce / 2; // se o puxado for o jogador, ele sofrerá apenas metade da força
+            gForce -= 0.1;
 
             if(eventDuration > 5) {
-                eventTarget.puller.x = lerp(eventTarget.puller.x, lastCharacterPosition, 0.15);
-                const outerHoleRadius = scenary.innerHoleWidth / 2;
-                const holeEdge = (eventTarget.puller == player) ?
-                                    (scenary.holeX - (outerHoleRadius + eventTarget.pulled.width / 2)) :
-                                    (scenary.holeX + (outerHoleRadius - eventTarget.pulled.width / 2));
+                if(eventDuration > 15) gEventTarget.puller.sprite = gEventTarget.puller.idleSprite
 
-                if((eventTarget.puller === player && eventTarget.pulled.x >= holeEdge)
-                || (eventTarget.puller === opponent && eventTarget.pulled.x <= holeEdge)) {
-                    force = 5;
-                    eventTarget = eventTarget.pulled;
-                    lastFallenY = eventTarget.y;
-                    lastFallenHeight = eventTarget.height;
-                    lastFallenForce = (eventTarget == player) ? -force : forceOnOpponent;
-                    currentEvent = EVENTS.FELL;
+                gRope.x = lerp(gRope.x, gDefaultRopePosition, 0.15);
+                gEventTarget.puller.x = lerp(gEventTarget.puller.x, gLastCharacterPosition, 0.15);
+
+                const holeEdge = (gEventTarget.puller == gPlayer) ?
+                                    gScenary.holeWidth - (gEventTarget.pulled.width * 1.4) :
+                                    //                                               v pro player não ficar grudado na borda
+                                    (gScenary.holeWidth + gEventTarget.pulled.width) - 10;
+
+                if((gEventTarget.puller === gPlayer && gEventTarget.pulled.x >= holeEdge)
+                || (gEventTarget.puller === gOpponent && gEventTarget.pulled.x <= holeEdge)) {
+                    gEventTarget = gEventTarget.pulled;
+
+                    gLastFallenY = gEventTarget.y;
+                    gLastFallenWidth = gEventTarget.width
+                    gLastFallenHeight = gEventTarget.height;
+                    //                                                                            v adicional pra compensar se a força for muito baixa
+                    gLastFallenForce = (gEventTarget == gPlayer) ? appliedForce : forceOnOpponent + 2
+
+                    gForce = 5;
+                    gCurrentEvent = EVENTS.FELL;
                 }
             }
 
@@ -441,48 +491,59 @@ function draw() {
             if(eventDuration >= eventEnd) returnToDefaultEvent();
         } break;
         case EVENTS.FELL: {
-            eventTarget.x += lastFallenForce;
-            eventTarget.y += fall;
-            eventTarget.height -= fall;
-            fall += 1.5;
+            gEventTarget.x += gLastFallenForce;
+            gEventTarget.y += gFall * 1.3;
+            gEventTarget.width -= 5;
+            gEventTarget.height -= gFall;
+            gFall += 1.5;
 
-            if(eventTarget.height <= 0) {
-                if(eventTarget === player) location.reload(); // TODO: tela de morte
+            if(gEventTarget.height <= 0) {
+                if(gEventTarget === gPlayer) {
+                    const record = localStorage.getItem("record");
+                    // TODO: tela de morte
+                    location.reload();
+                    if(gScoringSystem.score > record) localStorage.setItem("record", gScoringSystem.score);
+                }
 
-                fall = 0;
-                eventTarget.x = -eventTarget.width; // fora da tela
-                eventTarget.y = lastFallenY;
-                eventTarget.height = lastFallenHeight;
+                gFall = 0;
+                gEventTarget.x = -gEventTarget.width; // fora da tela
+                gEventTarget.y = gLastFallenY;
+                gEventTarget.width = gLastFallenWidth;
+                gEventTarget.height = gLastFallenHeight;
 
-                lastEventFrame = frameCount;
-                currentEvent = EVENTS.REAPEARANCE;
+                gLastEventFrame = frameCount;
+                gCurrentEvent = EVENTS.REAPEARANCE;
 
-                lastScoreFrame = frameCount;
-                scored = true;
+                gScoringSystem.lastScoreFrame = frameCount;
+                gScoringSystem.scored = true;
             }
         } break;
         case EVENTS.REAPEARANCE: {
-            const eventDuration = frameCount - lastEventFrame;
+            const eventDuration = frameCount - gLastEventFrame;
 
             // no início do evento
             if(eventDuration <= 10) {
-                player.x += force;
-                force -= 0.1;
+                gPlayer.sprite = gPlayer.pullingSprite
+                gPlayer.x += gForce;
+                gRope.x += gForce;
+                gForce -= 0.1;
             }
 
             // durante todo o evento
             if(eventDuration > 5) {
-                opponent.x = Math.floor(lerp(opponent.x, defaultOpponentPosition, 0.1));
+                gOpponent.x = Math.floor(lerp(gOpponent.x, gDefaultOpponentPosition, 0.1));
             }
 
             if(eventDuration > 10) {
-                player.x = Math.floor(lerp(player.x, lastCharacterPosition, 0.1));
+                gPlayer.sprite = gPlayer.pulledSprite
+                gPlayer.x = Math.floor(lerp(gPlayer.x, gLastCharacterPosition, 0.1));
+                gRope.x = Math.floor(lerp(gRope.x, gDefaultRopePosition, 0.1));
             }
 
             // no final do evento
             if(eventDuration >= 40) {
-                round++;
-                pullingSystem.pointerVelocity += 0.1;
+                gRound++;
+                gPullingSystem.pointerVelocity += 0.1;
                 returnToDefaultEvent();
             }
         } break;
@@ -492,19 +553,19 @@ function draw() {
 
 // executará toda vez que o usuário apertar alguma tecla
 function keyPressed() {
-    if(keyCode === 32 && currentEvent === EVENTS.NONE) { // ao pressionar a tecla «espaço»
-        lastEventFrame = frameCount;
+    if(keyCode === 32 && gCurrentEvent === EVENTS.NONE) { // ao pressionar a tecla «espaço»
+        gLastEventFrame = frameCount;
 
-        if(pullingSystem.isPointerInBounds()) {
-            eventTarget = {puller: player, pulled: opponent};
-            lastCharacterPosition = player.x;
-            pullingSystem.lastWasHit = true;
+        if(gPullingSystem.isPointerInBounds()) {
+            gEventTarget = {puller: gPlayer, pulled: gOpponent};
+            gLastCharacterPosition = gPlayer.x;
+            gPullingSystem.lastWasHit = true;
         } else {
-            eventTarget = {puller: opponent, pulled: player};
-            lastCharacterPosition = opponent.x;
-            pullingSystem.lastWasFail = true;
+            gEventTarget = {puller: gOpponent, pulled: gPlayer};
+            gLastCharacterPosition = gOpponent.x;
+            gPullingSystem.lastWasFail = true;
         }
 
-        currentEvent = EVENTS.PULL;
+        gCurrentEvent = EVENTS.PULL;
     }
 }
