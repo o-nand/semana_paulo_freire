@@ -11,16 +11,18 @@ let gPullingSystem,
     gOpponent;
 let gDefaultOpponentPosition;
 let gDefaultRopePosition;
+let gOpponentSpritesheets;
 
 const EVENTS = {
+    MENU: Symbol("menu"),
+    COUNTDOWN: Symbol("countdown"),
     PULL: Symbol("pull"),
     FELL: Symbol("fell"),
     REAPEARANCE: Symbol("reapearance"),
-    COUNTDOWN: Symbol("countdown"),
     NONE: Symbol("none")
 };
 
-let gCurrentEvent = EVENTS.COUNTDOWN;
+let gCurrentEvent = EVENTS.MENU;
 let gEventTarget;
 let gLastEventFrame = 0;
 
@@ -40,26 +42,19 @@ let count = 3;
 let countY;
 let countTransparency = 0;
 
+let menuFontSize = 64;
+let titleGrowthDirection = 1;
+
 // - Funções Auxiliares -
 
 function randomizeSprite(character) {
-    const spritesheets = [
-        {
-            idle:    "assets/zebraIdle.png",
-            pulling: "assets/zebraPulling.png",
-            pulled:  "assets/zebraPulled.png"
-        },
-        {
-            idle:    "assets/ovniIdle.png",
-            pulling: "assets/ovniPulling.png",
-            pulled:  "assets/ovniPulled.png"
-        }
-    ];
-    const selectedSpritesheet = spritesheets[Math.floor(Math.random() * spritesheets.length)];
+    const selectedSpritesheet = gOpponentSpritesheets[
+                                    Math.floor(Math.random() * gOpponentSpritesheets.length)
+                                ];
 
-    character.idleSprite = loadImage(selectedSpritesheet.idle);
-    character.pullingSprite = loadImage(selectedSpritesheet.pulling);
-    character.pulledSprite = loadImage(selectedSpritesheet.pulled);
+    character.idleSprite = selectedSpritesheet.idle;
+    character.pullingSprite = selectedSpritesheet.pulling;
+    character.pulledSprite = selectedSpritesheet.pulled;
 
     character.sprite = character.pulledSprite;
 }
@@ -275,7 +270,7 @@ class Scenary {
         this.terrainX = 0;
         this.terrainY = displayHeight - this.terrainHeight;
         this.terrainWidth = displayWidth;
-        
+
         this.backgroundY = -(this.terrainHeight / 6);
 
         this.holeSprite = loadImage("assets/buraco.png");
@@ -367,6 +362,18 @@ function setup() {
         loadImage("assets/cobraPulling.png"),
         loadImage("assets/cobraPulled.png")
     );
+    gOpponentSpritesheets = [
+        { // zebra
+            idle: loadImage("assets/zebraIdle.png"),
+            pulling: loadImage("assets/zebraPulling.png"),
+            pulled: loadImage("assets/zebraPulled.png")
+        },
+        { // ovni
+            idle: loadImage("assets/ovniIdle.png"),
+            pulling: loadImage("assets/ovniPulling.png"),
+            pulled: loadImage("assets/ovniPulled.png")
+        }
+    ];
     gDefaultOpponentPosition = gOpponent.x;
 
     gRope = new Rope(
@@ -389,7 +396,7 @@ function draw() {
     gOpponent.draw();
     gRope.draw();
 
-    if(gCurrentEvent !== EVENTS.COUNTDOWN) {
+    if(gCurrentEvent !== EVENTS.COUNTDOWN && gCurrentEvent !== EVENTS.MENU) {
         gPullingSystem.drawContainer();
         gScoringSystem.drawScore();
     }
@@ -399,6 +406,26 @@ function draw() {
     }
 
     switch(gCurrentEvent) {
+        case EVENTS.MENU: {
+            const textX = displayWidth / 2;
+
+            fill(0, 0, 0, 200);
+            rect(0, 0, displayWidth, displayHeight);
+
+            fill(255, 255, 255); //branco
+            textSize(16);
+            textAlign(CENTER);
+            text("Recorde:\n" + gScoringSystem.record, textX, 20);
+    
+            textSize(menuFontSize);
+            textAlign(CENTER);
+            text("Aperte «espaço» para\nPUXAR", textX, countY);
+
+            menuFontSize += 0.05 * titleGrowthDirection;
+            if(menuFontSize > 64 || menuFontSize < 58) {
+                titleGrowthDirection *= -1;
+            }
+        } break;
         case EVENTS.COUNTDOWN: {
             const eventDuration = frameCount - gLastEventFrame;
             let message = count;
@@ -493,9 +520,9 @@ function draw() {
                 gEventTarget.puller.x = lerp(gEventTarget.puller.x, gLastCharacterPosition, 0.15);
 
                 const holeEdge = (gEventTarget.puller == gPlayer) ?
-                                    gScenary.holeWidth - (gEventTarget.pulled.width * 1.4) :
+                                    gScenary.holeWidth - (gEventTarget.pulled.width * 1.5) :
                                     //                                               v pro player não ficar grudado na borda
-                                    (gScenary.holeWidth + gEventTarget.pulled.width) - 10;
+                                    (gScenary.holeWidth + gEventTarget.pulled.width) - 5;
 
                 if((gEventTarget.puller === gPlayer && gEventTarget.pulled.x >= holeEdge)
                 || (gEventTarget.puller === gOpponent && gEventTarget.pulled.x <= holeEdge)) {
@@ -579,19 +606,23 @@ function draw() {
 
 // executará toda vez que o usuário apertar alguma tecla
 function keyPressed() {
-    if(keyCode === 32 && gCurrentEvent === EVENTS.NONE) { // ao pressionar a tecla «espaço»
-        gLastEventFrame = frameCount;
+    if(keyCode === 32) { // ao pressionar a tecla «espaço»
+        if(gCurrentEvent == EVENTS.NONE) {
+            gLastEventFrame = frameCount;
 
-        if(gPullingSystem.isPointerInBounds()) {
-            gEventTarget = {puller: gPlayer, pulled: gOpponent};
-            gLastCharacterPosition = gPlayer.x;
-            gPullingSystem.lastWasHit = true;
-        } else {
-            gEventTarget = {puller: gOpponent, pulled: gPlayer};
-            gLastCharacterPosition = gOpponent.x;
-            gPullingSystem.lastWasFail = true;
+            if(gPullingSystem.isPointerInBounds()) {
+                gEventTarget = {puller: gPlayer, pulled: gOpponent};
+                gLastCharacterPosition = gPlayer.x;
+                gPullingSystem.lastWasHit = true;
+            } else {
+                gEventTarget = {puller: gOpponent, pulled: gPlayer};
+                gLastCharacterPosition = gOpponent.x;
+                gPullingSystem.lastWasFail = true;
+            }
+
+            gCurrentEvent = EVENTS.PULL;
+        } else if(gCurrentEvent == EVENTS.MENU) {
+            gCurrentEvent = EVENTS.COUNTDOWN;
         }
-
-        gCurrentEvent = EVENTS.PULL;
     }
 }
