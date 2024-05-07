@@ -42,6 +42,28 @@ let countTransparency = 0;
 
 // - Funções Auxiliares -
 
+function randomizeSprite(character) {
+    const spritesheets = [
+        {
+            idle:    "assets/zebraIdle.png",
+            pulling: "assets/zebraPulling.png",
+            pulled:  "assets/zebraPulled.png"
+        },
+        {
+            idle:    "assets/ovniIdle.png",
+            pulling: "assets/ovniPulling.png",
+            pulled:  "assets/ovniPulled.png"
+        }
+    ];
+    const selectedSpritesheet = spritesheets[Math.floor(Math.random() * spritesheets.length)];
+
+    character.idleSprite = loadImage(selectedSpritesheet.idle);
+    character.pullingSprite = loadImage(selectedSpritesheet.pulling);
+    character.pulledSprite = loadImage(selectedSpritesheet.pulled);
+
+    character.sprite = character.pulledSprite;
+}
+
 function returnToDefaultEvent() {
     gCurrentEvent = EVENTS.NONE;
     gPullingSystem.randomizeContained();
@@ -341,9 +363,9 @@ function setup() {
         characterWidth,
         characterHeight,
         color(122, 18, 59),
-        loadImage("assets/ovniIdle.png"),
-        loadImage("assets/ovniPulling.png"),
-        loadImage("assets/ovniPulled.png")
+        loadImage("assets/cobraIdle.png"),
+        loadImage("assets/cobraPulling.png"),
+        loadImage("assets/cobraPulled.png")
     );
     gDefaultOpponentPosition = gOpponent.x;
 
@@ -514,6 +536,7 @@ function draw() {
                 gEventTarget.width = gLastFallenWidth;
                 gEventTarget.height = gLastFallenHeight;
 
+                randomizeSprite(gOpponent);
                 gLastEventFrame = frameCount;
                 gCurrentEvent = EVENTS.REAPEARANCE;
 
