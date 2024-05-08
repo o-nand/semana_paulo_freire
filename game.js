@@ -19,15 +19,16 @@ const EVENTS = {
     PULL: Symbol("pull"),
     FELL: Symbol("fell"),
     REAPEARANCE: Symbol("reapearance"),
+    DEATH: Symbol("death"),
     NONE: Symbol("none")
 };
 
-let gCurrentEvent = EVENTS.MENU;
-let gEventTarget;
-let gLastEventFrame = 0;
+let gCurrentEvent = EVENTS.MENU,
+    gEventTarget,
+    gLastEventFrame = 0;
 
-let gLastCharacterPosition;
-let gLastFallenY,
+let gLastCharacterPosition,
+    gLastFallenY,
     gLastFallenWidth,
     gLastFallenHeight,
     gLastFallenForce;
@@ -38,37 +39,24 @@ let gAngle = 0,
 
 let gRound = 0;
 
-let count = 3;
-let countY;
-let countTransparency = 0;
+let gTextX;
 
-let menuFontSize = 64;
-let titleGrowthDirection = 1;
+let count = 3,
+    countY,
+    countTransparency = 0;
 
-// - Funções Auxiliares -
+let menuFontSize = 64,
+    menuTitleGrowthDirection = 1;
 
-function randomizeSprite(character) {
-    const selectedSpritesheet = gOpponentSpritesheets[
-                                    Math.floor(Math.random() * gOpponentSpritesheets.length)
-                                ];
-
-    character.idleSprite = selectedSpritesheet.idle;
-    character.pullingSprite = selectedSpritesheet.pulling;
-    character.pulledSprite = selectedSpritesheet.pulled;
-
-    character.sprite = character.pulledSprite;
-}
-
-function returnToDefaultEvent() {
-    gCurrentEvent = EVENTS.NONE;
-    gPullingSystem.randomizeContained();
-    gFall = 0;
-    gForce = 5;
-}
-
-function randomRange(mininum, maximum) {
-    return Math.random() * (maximum - mininum) + mininum;
-}
+let deathScreenX,
+    deathScreenY,
+    deathScreenWidth = 20,
+    deathScreenHeight = 20,
+    deathScreenTitleSize = 12,
+    deathScreenTitleY,
+    deathScreenRestartSize = 12,
+    deathScreenRestartY,
+    deathScreenRestartDirection = 1;
 
 // - Estruturas -
 
@@ -205,7 +193,6 @@ class ScoringSystem {
 
         this.newPointSize = 0;
         this.newPointY = displayHeight / 2;
-        this.textX = displayWidth / 2;
 
         this.scored = false;
         this.lastScoreFrame = 0;
@@ -213,12 +200,13 @@ class ScoringSystem {
 
     drawScore() {
         fill(255, 255, 255);
+        textAlign(CENTER);
+
         textSize(16);
-        textAlign(CENTER);
-        text("recorde: " + this.record, this.textX, 85);
+        text("Recorde: " + this.record, gTextX, 85);
+
         textSize(64);
-        textAlign(CENTER);
-        text(this.score, this.textX, 60);
+        text(this.score, gTextX, 60);
     }
 
     drawNewPoint() {
@@ -227,7 +215,7 @@ class ScoringSystem {
         fill(255, 255, 255);
         textAlign(CENTER);
         textSize(this.newPointSize);
-        text("+1", this.textX, this.newPointY);
+        text("+1", gTextX, this.newPointY);
 
         // no início do evento
         if(scoreDuration <= 30) {
@@ -275,7 +263,7 @@ class Scenary {
 
         this.holeSprite = loadImage("assets/buraco.png");
         this.holeX = displayWidth / 4;
-        this.holeY = this.terrainY + 100;
+        this.holeY = this.terrainY + (this.terrainHeight / 3);
         this.holeWidth = displayWidth / 2.1;
         this.holeHeight = displayHeight / 5.8;
     }
@@ -325,6 +313,31 @@ class Rope {
     }
 }
 
+// - Funções Auxiliares -
+
+function randomizeSprite(character) {
+    const selectedSpritesheet = gOpponentSpritesheets[
+                                    Math.floor(Math.random() * gOpponentSpritesheets.length) // escolhe um grupo de sprites aleatório
+                                ];
+
+    character.idleSprite = selectedSpritesheet.idle;
+    character.pullingSprite = selectedSpritesheet.pulling;
+    character.pulledSprite = selectedSpritesheet.pulled;
+
+    character.sprite = character.pulledSprite;
+}
+
+function returnToDefaultEvent() {
+    gCurrentEvent = EVENTS.NONE;
+    gPullingSystem.randomizeContained();
+    gFall = 0;
+    gForce = 5;
+}
+
+function randomRange(mininum, maximum) {
+    return Math.random() * (maximum - mininum) + mininum;
+}
+
 // - Principais Funções -
 
 // executará apenas uma vez, no início do jogo
@@ -339,7 +352,7 @@ function setup() {
 
     const characterWidth = 160;
     const characterHeight = 240;
-    const characterY = (gScenary.terrainY * 1.4) - characterHeight;
+    const characterY = (gScenary.terrainY * 1.35) - characterHeight;
 
     gPlayer = new Character(
         displayWidth - (displayWidth / 8), // canto direito
@@ -381,8 +394,15 @@ function setup() {
     );
     gDefaultRopePosition = gRope.x;
 
+    gTextX = displayWidth / 2;
+
     //                             v offset pra deixar o texto inicialmente um pouco abaixo
     countY = (displayHeight / 3) - 40;
+
+    deathScreenX = gScenary.holeX + (gScenary.holeWidth / 2);
+    deathScreenY = gScenary.holeY;
+    deathScreenTitleY = deathScreenY;
+    deathScreenRestartY = deathScreenY;
 }
 
 // executará todo frame
@@ -407,23 +427,22 @@ function draw() {
 
     switch(gCurrentEvent) {
         case EVENTS.MENU: {
-            const textX = displayWidth / 2;
-
+            // escurece a tela
             fill(0, 0, 0, 200);
             rect(0, 0, displayWidth, displayHeight);
 
-            fill(255, 255, 255); //branco
-            textSize(16);
+            fill(255, 255, 255);
             textAlign(CENTER);
-            text("Recorde:\n" + gScoringSystem.record, textX, 20);
-    
-            textSize(menuFontSize);
-            textAlign(CENTER);
-            text("Aperte «espaço» para\nPUXAR", textX, countY);
 
-            menuFontSize += 0.05 * titleGrowthDirection;
+            textSize(16);
+            text("Recorde:\n" + gScoringSystem.record, gTextX, 20);
+
+            textSize(menuFontSize);
+            text("Aperte «espaço» para\nPUXAR", gTextX, countY);
+
+            menuFontSize += 0.05 * menuTitleGrowthDirection;
             if(menuFontSize > 64 || menuFontSize < 58) {
-                titleGrowthDirection *= -1;
+                menuTitleGrowthDirection *= -1;
             }
         } break;
         case EVENTS.COUNTDOWN: {
@@ -450,7 +469,7 @@ function draw() {
 
             textSize(128);
             textAlign(CENTER);
-            fill(255, 255, 255, countTransparency); // branco
+            fill(255, 255, 255, countTransparency);
             text(message, displayWidth / 2, countY);
         } break;
         case EVENTS.NONE: {
@@ -550,25 +569,27 @@ function draw() {
             gFall += 1.5;
 
             if(gEventTarget.height <= 0) {
+                gLastEventFrame = frameCount;
+
                 if(gEventTarget === gPlayer) {
                     const record = localStorage.getItem("record");
-                    // TODO: tela de morte
-                    location.reload();
                     if(gScoringSystem.score > record) localStorage.setItem("record", gScoringSystem.score);
+
+                    gPlayer.x = -gEventTarget.width; // fora da tela
+                    gCurrentEvent = EVENTS.DEATH;
+                } else {
+                    gFall = 0;
+                    gEventTarget.x = -gEventTarget.width; // fora da tela
+                    gEventTarget.y = gLastFallenY;
+                    gEventTarget.width = gLastFallenWidth;
+                    gEventTarget.height = gLastFallenHeight;
+
+                    randomizeSprite(gOpponent);
+                    gCurrentEvent = EVENTS.REAPEARANCE;
+
+                    gScoringSystem.lastScoreFrame = frameCount;
+                    gScoringSystem.scored = true;
                 }
-
-                gFall = 0;
-                gEventTarget.x = -gEventTarget.width; // fora da tela
-                gEventTarget.y = gLastFallenY;
-                gEventTarget.width = gLastFallenWidth;
-                gEventTarget.height = gLastFallenHeight;
-
-                randomizeSprite(gOpponent);
-                gLastEventFrame = frameCount;
-                gCurrentEvent = EVENTS.REAPEARANCE;
-
-                gScoringSystem.lastScoreFrame = frameCount;
-                gScoringSystem.scored = true;
             }
         } break;
         case EVENTS.REAPEARANCE: {
@@ -600,6 +621,44 @@ function draw() {
                 returnToDefaultEvent();
             }
         } break;
+        case EVENTS.DEATH: {
+            fill(0, 0, 0, 200);
+
+            if(Math.ceil(deathScreenWidth) != displayWidth) {
+                deathScreenWidth = lerp(deathScreenWidth, displayWidth, 0.1);
+                deathScreenX = lerp(deathScreenX, 0, 0.1);
+            }
+
+            if(Math.ceil(deathScreenHeight) != displayHeight) {
+                deathScreenHeight = lerp(deathScreenHeight, displayHeight, 0.1);
+                deathScreenY = lerp(deathScreenY, 0, 0.1);
+            }
+
+            rect(deathScreenX, deathScreenY, deathScreenWidth, deathScreenHeight);
+
+            if(Math.floor(deathScreenTitleY) != countY) {
+                deathScreenTitleSize = lerp(deathScreenTitleSize, 64, 0.1);
+                deathScreenTitleY = lerp(deathScreenTitleY, countY, 0.1);
+            }
+
+            fill(255, 255, 255);
+            textAlign(CENTER);
+            textSize(deathScreenTitleSize);
+            text("Você foi o PUXADO!", gTextX, deathScreenTitleY);
+
+            if(Math.floor(deathScreenRestartY) != (countY + 80)) {
+                deathScreenRestartSize = lerp(deathScreenRestartSize, 32, 0.1);
+                deathScreenRestartY = lerp(deathScreenRestartY, deathScreenTitleY + 80, 0.1);
+            }
+
+            deathScreenRestartSize += 0.05 * deathScreenRestartDirection;
+            if(deathScreenRestartSize > 32 || deathScreenRestartSize < 30) {
+                deathScreenRestartDirection *= -1;
+            }
+
+            textSize(deathScreenRestartSize)
+            text("Aperte «espaço» para\nREENCARNAR", gTextX, deathScreenRestartY);
+        } break;
         default: /* unreachable */ break;
     }
 }
@@ -607,22 +666,28 @@ function draw() {
 // executará toda vez que o usuário apertar alguma tecla
 function keyPressed() {
     if(keyCode === 32) { // ao pressionar a tecla «espaço»
-        if(gCurrentEvent == EVENTS.NONE) {
-            gLastEventFrame = frameCount;
+        switch(gCurrentEvent) {
+            case EVENTS.NONE: {
+                gLastEventFrame = frameCount;
 
-            if(gPullingSystem.isPointerInBounds()) {
-                gEventTarget = {puller: gPlayer, pulled: gOpponent};
-                gLastCharacterPosition = gPlayer.x;
-                gPullingSystem.lastWasHit = true;
-            } else {
-                gEventTarget = {puller: gOpponent, pulled: gPlayer};
-                gLastCharacterPosition = gOpponent.x;
-                gPullingSystem.lastWasFail = true;
-            }
+                if(gPullingSystem.isPointerInBounds()) {
+                    gEventTarget = {puller: gPlayer, pulled: gOpponent};
+                    gLastCharacterPosition = gPlayer.x;
+                    gPullingSystem.lastWasHit = true;
+                } else {
+                    gEventTarget = {puller: gOpponent, pulled: gPlayer};
+                    gLastCharacterPosition = gOpponent.x;
+                    gPullingSystem.lastWasFail = true;
+                }
 
-            gCurrentEvent = EVENTS.PULL;
-        } else if(gCurrentEvent == EVENTS.MENU) {
-            gCurrentEvent = EVENTS.COUNTDOWN;
+                gCurrentEvent = EVENTS.PULL;
+            } break;
+            case EVENTS.MENU: {
+                gLastEventFrame = frameCount;
+                gCurrentEvent = EVENTS.COUNTDOWN;
+            } break;
+            case EVENTS.DEATH: location.reload(); break; // recarega a página
+            default: /* pass */ break;
         }
     }
 }
