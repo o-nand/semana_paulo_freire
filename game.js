@@ -617,7 +617,11 @@ function draw() {
             // no final do evento
             if(eventDuration >= 40) {
                 gRound++;
-                gPullingSystem.pointerVelocity += 0.1;
+                if(gRound % 10 == 0) {
+                    gPullingSystem.pointerVelocity += (gRound >= 20) ? 0.2 : 0.3;
+                } else {
+                    gPullingSystem.pointerVelocity += (gRound >= 13) ? 0.04 : 0.12;
+                }
                 returnToDefaultEvent();
             }
         } break;
@@ -689,5 +693,10 @@ function keyPressed() {
             case EVENTS.DEATH: location.reload(); break; // recarega a página
             default: /* pass */ break;
         }
+    }
+
+    if(keyCode == 48) { // ao pressionar a tecla «0»
+        localStorage.setItem("record", 0);
+        location.reload();
     }
 }
